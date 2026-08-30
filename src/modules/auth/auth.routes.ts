@@ -37,7 +37,7 @@ router.post('/request-otp', otpRateLimit, async (req, res) => {
 
   if (env.USE_MOCK_OTP) {
     const verificationId = genId();
-    const code = '123456'; // mock accepts any 6 digits, but we store this
+    const code = '123456'; // deterministic for tests; verify accepts any 6 digits in mock
     otpStore.set(normalized, { code, verificationId, expiresAt: Date.now() + 120000 });
     return sendSuccess(res, { verificationId, expiresIn: 120, mock: true }, 'OTP sent (mock)');
   }
@@ -86,16 +86,17 @@ router.post('/verify-otp', async (req, res) => {
   }
 
   if (env.USE_MOCK_OTP) {
-    // Accept any 6-digit code in mock mode
-    if (!/^\d{6}$/.test(parsed.data.code) && parsed.data.code !== '123456') {
-      // Still accept any 6 digits per spec
-      if (!/^\d{6}$/.test(parsed.data.code)) {
-        return sendError(res, 400, 'Invalid code format');
-      }
+    // Mock OTP: accept any 6-digit code per spec (BASITA_BACKEND_PLAN.md §2.1). Ignore stored code & verificationId for dev.
+    if (!/^\d{6}$/.test(parsed.data.code)) {
+      return sendError(res, 400, 'Invalid code format: must be 6 digits');
     }
     const stored = otpStore.get(normalized);
     if (stored && parsed.data.verificationId && stored.verificationId !== parsed.data.verificationId) {
-      // In mock, ignore verificationId mismatch but log
+      console.warn(`[mock-otp] verificationId mismatch for ${normalized}: got ${parsed.data.verificationId}, expected ${stored.verificationId} – accepting anyway in mock`);
+    }
+    // Optional: check expiry in mock as well (allow but warn)
+    if (stored && Date.now() > stored.expiresAt) {
+      console.warn(`[mock-otp] OTP expired for ${normalized} – accepting anyway in mock`);
     }
     // Find user by phone
     const userIdByPhone = store.usersByPhone.get(normalized);

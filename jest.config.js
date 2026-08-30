@@ -6,7 +6,7 @@ module.exports = {
   moduleFileExtensions: ['ts', 'js', 'json'],
   collectCoverageFrom: ['src/**/*.{ts,js}', '!src/**/*.d.ts'],
   coverageDirectory: 'coverage',
-  setupFiles: ['dotenv/config'],
+  setupFiles: ['<rootDir>/tests/setup.ts', 'dotenv/config'],
   testTimeout: 15000,
   globals: {
     'ts-jest': {

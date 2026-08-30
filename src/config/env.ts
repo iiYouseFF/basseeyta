@@ -31,7 +31,8 @@ export const env = {
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
   REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
   CRON_SECRET: process.env.CRON_SECRET || 'dev_cron_secret',
-  USE_MOCK_OTP: process.env.USE_MOCK_OTP === 'true',
+  // Mock OTP: default true in dev/test, explicit false only in production with real Firebase. Prevents CI failures when .env is missing.
+  USE_MOCK_OTP: process.env.USE_MOCK_OTP ? process.env.USE_MOCK_OTP === 'true' : process.env.NODE_ENV !== 'production',
 };
 
 export const isProduction = env.NODE_ENV === 'production';

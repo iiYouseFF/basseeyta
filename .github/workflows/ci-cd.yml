@@ -24,6 +24,15 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     needs: lint-and-typecheck
+    env:
+      NODE_ENV: test
+      USE_MOCK_OTP: 'true'
+      JWT_SECRET: test_jwt_secret_32_chars_min_for_ci
+      JWT_EXPIRES_IN: 1h
+      CRON_SECRET: test_cron_secret
+      SUPABASE_URL: https://test.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: test_key
+      REDIS_URL: redis://localhost:6379
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
