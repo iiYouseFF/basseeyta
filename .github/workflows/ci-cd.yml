@@ -74,11 +74,21 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT || 22 }}
           script: |
+            set -e
             cd /var/www/basita-backend || cd /var/www/basseeyta
-            git pull origin main
-            npm ci --omit=dev
+            # Fix divergent branches after force-push (history rewrite for .env purge)
+            git fetch origin main
+            git reset --hard origin/main
+            # Install all deps (need tsc for build), then build, then prune to production
+            npm ci
             npm run build
-            pm2 reload ecosystem.config.js --env production || pm2 restart basita-api --update-env
-            sleep 3
-            curl -f http://localhost:3000/health || exit 1
+            # Reload or start PM2 (ecosystem.config.js is at repo root)
+            if pm2 describe basita-api > /dev/null 2>&1; then
+              pm2 reload ecosystem.config.js --env production --update-env
+            else
+              pm2 start ecosystem.config.js --env production
+            fi
+            pm2 save
+            sleep 5
+            curl -f http://localhost:3000/health || (pm2 logs basita-api --lines 50 --nostream; exit 1)
             echo "Deploy succeeded"
