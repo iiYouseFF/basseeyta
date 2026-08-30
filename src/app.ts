@@ -30,6 +30,7 @@ import appointmentsRoutes from './modules/appointments/appointments.routes';
 import familyRoutes from './modules/family/family.routes';
 import verificationRoutes from './modules/verification/verification.routes';
 import aiRoutes from './modules/ai/ai.routes';
+import docsRoutes from './modules/docs/docs.routes';
 
 export function createApp() {
   const app = express();
@@ -59,6 +60,10 @@ export function createApp() {
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', version: '1.0.0', timestamp: new Date().toISOString() });
   });
+
+  // API docs – must be before 404
+  app.use('/', docsRoutes); // handles /, /api, /api-docs, /api-docs.json
+  app.use('/api-docs', docsRoutes); // alias
 
   // Mount routes – order matters for overlapping prefixes
   // Family and offers/payment handle multiple top-level prefixes, mount at root
