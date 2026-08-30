@@ -5,14 +5,22 @@ let supabase: SupabaseClient | null = null;
 
 export function getSupabase(): SupabaseClient | null {
   if (supabase) return supabase;
-  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_ROLE_KEY === '...') {
-    console.warn('[supabase] Missing SUPABASE_URL or SERVICE_ROLE_KEY – storage/db will use fallback/mocks');
+  if (process.env.NODE_ENV === 'test') {
     return null;
   }
-  supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  return supabase;
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_ROLE_KEY === '...' || env.SUPABASE_SERVICE_ROLE_KEY === 'test_key') {
+    // In test/CI, return null to use memory fallback and avoid WebSocket requirement
+    return null;
+  }
+  try {
+    supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    return supabase;
+  } catch (e: any) {
+    console.warn('[supabase] Failed to create client, using fallback:', e.message);
+    return null;
+  }
 }
 
 // For direct pg pool
