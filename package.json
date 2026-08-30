@@ -11,7 +11,9 @@
     "test:coverage": "jest --coverage --runInBand",
     "lint": "eslint src --ext .ts --max-warnings 0",
     "typecheck": "tsc --noEmit",
-    "migrate": "ts-node scripts/migrate.ts"
+    "migrate": "ts-node scripts/migrate.ts",
+    "smoke": "npm run build && node scripts/test-all-endpoints.js",
+    "smoke:live": "API_BASE=https://basseeyta.duckdns.org node scripts/test-all-endpoints.js"
   },
   "engines": {
     "node": ">=20.0.0"
