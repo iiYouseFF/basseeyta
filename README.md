@@ -4,7 +4,7 @@ Node.js (Express 4 + Socket.io 4) · Supabase PostgreSQL 17 · Firebase Auth + F
 
 Replaces Flutter frontend-only mock (`lib/core/network/mock_backend.dart`) with real REST API. Flutter switches via `API_BASE_URL`.
 
-**Deployed:** `https://api.basita.example.com` (VPS via PM2 + Nginx, GitHub Actions CI/CD)
+**Deployed:** `http://basseeyta.duckdns.org/` (VPS via PM2 + Nginx, GitHub Actions CI/CD)
 
 ## Stack
 
@@ -48,7 +48,7 @@ See `.env.example` for all vars. Required:
 
 ## API
 
-Base URL: `http://localhost:3000` or `https://api.basita.example.com`
+Base URL: `http://localhost:3000` or `http://basseeyta.duckdns.org/`
 
 **Auth:** `Authorization: Bearer <jwt>` (from `POST /auth/verify-otp`)
 
@@ -168,7 +168,7 @@ npm test
 
 Flutter switch:
 ```bash
-flutter run --dart-define=API_BASE_URL=https://api.basita.example.com --dart-define=USE_MOCK_OTP=false
+flutter run --dart-define=API_BASE_URL=http://basseeyta.duckdns.org/ --dart-define=USE_MOCK_OTP=false
 ```
 
 ## Project Structure

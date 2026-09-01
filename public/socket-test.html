@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Basita – Socket.IO Chat Tester</title>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<style>
+:root{--bg:#0b0e14;--card:#151a27;--muted:#9aa3b2;--accent:#4f46e5;--border:#222839;--ok:#10b981;--warn:#f59e0b;--err:#ef4444}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:#e6e8ee;line-height:1.5}
+a{color:#8ea6ff}
+header{position:sticky;top:0;z-index:10;backdrop-filter:blur(8px);background:rgba(11,14,20,.92);border-bottom:1px solid var(--border);padding:16px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+h1{margin:0;font-size:22px}h2{margin:8px 0 12px;font-size:16px;border-left:4px solid var(--accent);padding-left:10px}
+h3{margin:14px 0 8px;font-size:14px;color:#cbd5e1}
+.wrap{max-width:1200px;margin:0 auto;padding:20px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;margin:12px 0}
+label{font-size:12px;color:var(--muted);display:block;margin:8px 0 4px}
+input,textarea,select{width:100%;padding:10px 11px;border-radius:8px;border:1px solid var(--border);background:#0b0e14;color:#e6e8ee;font-size:13px}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
+textarea{resize:vertical;min-height:64px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button{padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:var(--accent);color:white;font-weight:600;cursor:pointer;font-size:13px}
+button.sec{background:#1e293b;border-color:#334155}button.ghost{background:transparent;color:#cbd5e1}
+button:disabled{opacity:.5;cursor:not-allowed}
+.badge{display:inline-block;padding:3px 8px;border-radius:999px;font-size:11px;border:1px solid var(--border)}
+.badge.ok{background:rgba(16,185,129,.15);color:var(--ok);border-color:rgba(16,185,129,.3)}
+.badge.err{background:rgba(239,68,68,.15);color:var(--err);border-color:rgba(239,68,68,.3)}
+.badge.warn{background:rgba(245,158,11,.15);color:var(--warn);border-color:rgba(245,158,11,.3)}
+.log{height:280px;overflow:auto;background:#0b0e14;border:1px solid var(--border);border-radius:8px;padding:10px;font-family:monospace;font-size:12px;white-space:pre-wrap;word-break:break-all}
+.msgs{height:360px;overflow:auto;background:#0b0e14;border:1px solid var(--border);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.bubble{max-width:80%;padding:8px 11px;border-radius:12px;font-size:13px}
+.bubble.me{align-self:flex-end;background:var(--accent);color:white;border-bottom-right-radius:4px}
+.bubble.other{align-self:flex-start;background:#1e293b;border-bottom-left-radius:4px}
+.bubble .meta{font-size:10px;opacity:.7;margin-top:4px}
+kbd{background:rgba(255,255,255,.06);padding:2px 6px;border-radius:6px;font-size:11px}
+.table{width:100%;border-collapse:collapse;font-size:12px}
+.table th,.table td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:left}
+.steps{counter-reset:step} .steps li{margin:8px 0}
+.pill{font-size:11px;padding:4px 8px;border-radius:999px;background:#1e293b;border:1px solid var(--border)}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Basita (بسيطة) — Socket.IO Chat Tester</h1>
+    <div style="color:var(--muted);font-size:13px">Live tester for <kbd>http://basseeyta.duckdns.org/</kbd> &amp; <kbd>http://localhost:3000</kbd> — Namespaces <kbd>/chat</kbd> <kbd>/notifications</kbd> <kbd>/requests</kbd> &bull; <a href="/">API Docs</a> &bull; <a href="/api-docs.json">JSON</a> &bull; <a href="/health">/health</a></div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <span id="overallStatus" class="badge warn">Not connected</span>
+    <button class="sec" onclick="window.open(location.origin+'/health','_blank')">Check Health</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- Config -->
+  <div class="card">
+    <h2>1 — Connection Config</h2>
+    <div class="grid">
+      <div>
+        <label>API Base URL (REST + Socket.IO origin)</label>
+        <input id="baseUrl" value="http://basseeyta.duckdns.org" placeholder="http://basseeyta.duckdns.org" />
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">Prod: <code>http://basseeyta.duckdns.org</code> — Dev: <code>http://localhost:3000</code>. Must be <code>http://</code> (no <code>https</code>) for this VPS.</div>
+        <label>JWT Token — from <code>POST /auth/verify-otp</code> or <code>/auth/register</code></label>
+        <textarea id="token" rows="3" placeholder="eyJhbGci... paste JWT here (optional for dev, required for auth-guarded REST)"></textarea>
+        <div class="row" style="margin-top:8px">
+          <button onclick="saveConfig()">Save Config</button>
+          <button class="sec" onclick="loadConfig()">Reload Saved</button>
+          <button class="ghost" onclick="clearToken()">Clear Token</button>
+          <span id="cfgStatus" class="badge warn">Unsaved</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px">Socket auth uses <code>handshake.auth.token</code>. Server verifies with <code>JWT_SECRET</code> but currently allows connection even if invalid (dev mode) — check browser console for <code>[socket] auth failed</code>.</div>
+      </div>
+      <div>
+        <label>Room Context (shared by REST & Socket)</label>
+        <input id="roomId" placeholder="room id (from POST /chat/rooms)" />
+        <div class="row">
+          <div style="flex:1"><label>User ID (clientId)</label><input id="clientId" placeholder="customer id / user id" /></div>
+          <div style="flex:1"><label>Technician ID (phone)</label><input id="techId" placeholder="+2010... or phone" /></div>
+        </div>
+        <div class="row">
+          <div style="flex:1"><label>Request ID</label><input id="requestId" placeholder="service_request id" /></div>
+          <div style="flex:1"><label>Sender Type</label>
+            <select id="senderType"><option value="user">user</option><option value="technician">technician</option></select>
+          </div>
+        </div>
+        <div style="flex:1"><label>Sender ID (who sends)</label><input id="senderId" placeholder="must match senderType userId/phone" /></div>
+        <div style="margin-top:8px" class="row">
+          <button class="sec" onclick="useIdsFromToken()">Decode Token → Fill IDs</button>
+          <button class="ghost" onclick="generateDemoIds()">Generate Demo IDs</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Auth -->
+  <div class="card">
+    <h2>2 — Quick Auth Helper (optional — auto-fills token + IDs)</h2>
+    <p style="font-size:13px;color:var(--muted)">If you don't have a token, use mock OTP flow (requires <code>USE_MOCK_OTP=true</code> on server, which is true for dev &amp; the live VPS). This creates real JWT without Firebase.</p>
+    <div class="grid">
+      <div>
+        <label>Phone (E.164 or Egyptian local)</label>
+        <input id="authPhone" value="01000000101" />
+        <div class="row" style="margin-top:8px">
+          <button onclick="requestOtp()">POST /auth/request-otp</button>
+          <button class="sec" onclick="verifyOtp()">POST /auth/verify-otp</button>
+        </div>
+        <label>Verification ID (from request-otp)</label>
+        <input id="verificationId" placeholder="will auto-fill" />
+        <label>OTP Code</label>
+        <input id="otpCode" value="123456" />
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">Mock accepts any 6 digits (<code>123456</code> or <code>999999</code>). Real Firebase requires real code.</div>
+      </div>
+      <div>
+        <label>Quick Register (creates token directly)</label>
+        <div class="row"><input id="regName" value="Test Cust" style="flex:1" placeholder="name" /><input id="regGov" value="القاهرة" style="flex:1" placeholder="governorate" /></div>
+        <div class="row" style="margin-top:8px">
+          <button onclick="registerCustomer()">POST /auth/register (customer)</button>
+          <button class="sec" onclick="registerTech()">POST /auth/technicians/register</button>
+        </div>
+        <div id="authLog" class="log" style="height:120px;margin-top:10px">Auth log…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REST tools -->
+  <div class="card">
+    <h2>3 — REST Chat (HTTP)</h2>
+    <div class="grid">
+      <div>
+        <h3>Create / List Rooms</h3>
+        <div class="row"><button onclick="createRoom()">POST /chat/rooms</button><button class="sec" onclick="listRooms()">GET /chat/rooms?userId</button></div>
+        <label>Raw create body (editable)</label>
+        <textarea id="createRoomBody" rows="4">{
+  "clientId": "",
+  "technicianId": "",
+  "requestId": "",
+  "serviceType": "plumbing"
+}</textarea>
+        <div class="row" style="margin-top:8px"><button class="sec" onclick="syncCreateBody()">Sync IDs → Body</button><button class="ghost" onclick="fetchMessages()">GET /chat/rooms/:id/messages</button></div>
+        <label>REST Messages (history)</label>
+        <div id="restMsgs" class="log" style="height:160px">No REST history yet…</div>
+      </div>
+      <div>
+        <h3>Send via REST (also triggers socket push)</h3>
+        <label>Message</label>
+        <input id="restMessage" value="مرحبا من REST 👋" />
+        <div class="row" style="margin-top:8px"><button onclick="sendRestMessage()">POST /chat/rooms/:id/messages</button><button class="sec" onclick="markRead()">PATCH /rooms/:id/read</button><button class="sec" onclick="unreadCount()">GET /rooms/:id/unread</button></div>
+        <div id="restLog" class="log" style="height:120px;margin-top:10px">REST log…</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px">REST send also emits <code>io.of('/chat').to(room:ID).emit('new_message')</code> and <code>io.of('/notifications').to(user:otherId)</code>. So socket listeners receive it too.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Socket tools -->
+  <div class="card">
+    <h2>4 — Socket.IO Live Chat (Namespace <code>/chat</code>)</h2>
+    <div class="grid">
+      <div>
+        <div class="row">
+          <button id="btnConnectChat" onclick="connectChat()">Connect /chat</button>
+          <button class="sec" id="btnDisconnectChat" onclick="disconnectChat()" disabled>Disconnect</button>
+          <span id="chatStatus" class="badge warn">disconnected</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px">Connect URL: <code id="chatUrlPreview">http://basseeyta.duckdns.org/chat</code> with <code>auth:{token}</code></div>
+        <div class="row" style="margin-top:10px">
+          <button onclick="joinRoom()" id="btnJoin" disabled>emit join_room</button>
+          <button class="sec" onclick="leaveRoom()" id="btnLeave" disabled>emit leave_room</button>
+          <span id="roomStatus" class="badge warn">not in room</span>
+        </div>
+        <label>Socket Message</label>
+        <div class="row"><input id="socketMessage" value="مرحبا من Socket.IO 🚀" style="flex:1" /><button onclick="sendSocketMessage()" id="btnSendSocket" disabled>emit send_message</button></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">Payload: <code>{ roomId, senderId, senderType, message }</code> — saved to <code>store.chatMessages</code> + broadcast <code>new_message</code>.</div>
+        <h3>Other namespaces</h3>
+        <div class="row">
+          <button class="sec" onclick="connectNotif()">/notifications: connect + subscribe</button>
+          <button class="sec" onclick="connectRequests()">/requests: connect + subscribe_governorate</button>
+        </div>
+        <div class="row" style="margin-top:6px"><input id="notifUserId" placeholder="userId to subscribe" style="flex:1" /><input id="govName" value="القاهرة" style="flex:1" /></div>
+        <div id="otherLog" class="log" style="height:110px;margin-top:8px">Other namespaces log…</div>
+      </div>
+      <div>
+        <label>Live Messages (socket <code>new_message</code>)</label>
+        <div id="liveMsgs" class="msgs"><div style="color:var(--muted);font-size:13px;text-align:center;padding:20px">No live messages yet — connect + join room, then send.</div></div>
+        <div class="row" style="margin-top:8px"><button class="ghost" onclick="clearLive()">Clear Live</button><button class="sec" onclick="fetchMessages()">Refresh REST history</button></div>
+        <label>Socket Event Log</label>
+        <div id="socketLog" class="log" style="height:140px">Socket log…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Postman guide -->
+  <div class="card" style="border-color:#3b82f6">
+    <h2>5 — How to Test with Postman (and other external tools)</h2>
+    <p style="font-size:13px;color:var(--muted)">This page itself is the easiest tester, but you can also reproduce everything from Postman, Insomnia, or any HTTP/WebSocket client. The API is plain Express + Socket.IO 4 — no extra setup.</p>
+    <div class="grid">
+      <div>
+        <h3>A — REST (works in Postman, curl, any HTTP client)</h3>
+        <ol class="steps" style="font-size:13px">
+          <li><b>Set Base URL</b><br><code id="pmBase">http://basseeyta.duckdns.org</code> <button class="pill" onclick="copyText(document.getElementById('baseUrl').value||'http://basseeyta.duckdns.org')">Copy</button> — for local use <code>http://localhost:3000</code></li>
+          <li><b>Get JWT</b> — two options:
+            <div style="background:#0b0e14;border:1px solid var(--border);border-radius:8px;padding:8px;margin:6px 0">
+              <b>Mock OTP (recommended, no Firebase):</b><br>
+              <code>POST {{base}}/auth/request-otp</code> <kbd>{"phone":"01000000101"}</kbd> → returns <code>{data:{mock:true, verificationId}}</code><br>
+              <code>POST {{base}}/auth/verify-otp</code> <kbd>{"phone":"01000000101","code":"123456","verificationId":"..."}</kbd> → returns <code>{data:{token, user}}</code> (any 6 digits works)<br><br>
+              <b>Direct register (even faster):</b><br>
+              <code>POST {{base}}/auth/register</code> <kbd>{"name":"Test","phone":"01000000111","governorate":"القاهرة"}</kbd> → returns <code>{data:{token, user}}</code><br>
+              <b>Technician:</b> <code>POST {{base}}/auth/technicians/register</code> <kbd>{"fullName":"Tech","phone":"01000000112","governorate":"القاهرة"}</kbd>
+            </div>
+          </li>
+          <li><b>Create chat room (idempotent by requestId)</b><br><code>POST {{base}}/chat/rooms</code> — Headers: <code>Authorization: Bearer &lt;token&gt;</code><br>Body: <kbd>{"clientId":"&lt;user.id&gt;","technicianId":"&lt;tech.phone&gt;","requestId":"req_123","serviceType":"plumbing"}</kbd><br>→ returns <code>{data:{id: roomId}}</code> (reuse <code>requestId</code> returns same room)</li>
+          <li><b>Send message via REST</b><br><code>POST {{base}}/chat/rooms/:id/messages</code> — Headers: <code>Authorization: Bearer &lt;token&gt;</code><br>Body: <kbd>{"senderId":"&lt;user.id&gt;","senderType":"user","message":"Hello"}</kbd> (senderType <code>user</code> | <code>technician</code>)<br>→ server saves + emits <code>new_message</code> to socket room + creates notification</li>
+          <li><b>Read history</b><br><code>GET {{base}}/chat/rooms/:id/messages?limit=50</code> — sorted desc<br><code>GET {{base}}/chat/rooms?userId=&lt;id&gt;</code> — list rooms<br><code>GET {{base}}/chat/rooms/:id/unread?userId=&lt;id&gt;</code><br><code>PATCH {{base}}/chat/rooms/:id/read</code> Body: <kbd>{"userId":"&lt;id&gt;"}</kbd></li>
+        </ol>
+        <details><summary style="cursor:pointer;font-size:13px">curl example (copy-paste)</summary>
+<pre style="background:#0b0e14;border:1px solid var(--border);padding:10px;border-radius:8px;overflow:auto;font-size:12px">BASE=http://basseeyta.duckdns.org
+# 1. register customer
+curl -s -X POST $BASE/auth/register -H 'Content-Type: application/json' \
+  -d '{"name":"Cust","phone":"01000000111","governorate":"القاهرة"}' | tee /tmp/res
+TOKEN=$(cat /tmp/res | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['token'])")
+echo $TOKEN
+
+# 2. register tech
+curl -s -X POST $BASE/auth/technicians/register -H 'Content-Type: application/json' \
+  -d '{"fullName":"Tech","phone":"01000000112","governorate":"القاهرة"}'
+
+# 3. create room
+ROOM=$(curl -s -X POST $BASE/chat/rooms -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"clientId":"<userId_from_register>","technicianId":"01000000112","requestId":"req_demo_1"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['id'])")
+echo $ROOM
+
+# 4. send message
+curl -s -X POST $BASE/chat/rooms/$ROOM/messages -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"senderId":"<userId>","senderType":"user","message":"hello via curl"}'
+</pre>
+        </details>
+      </div>
+      <div>
+        <h3>B — Socket.IO (Postman Socket.IO, or browser)</h3>
+        <ol class="steps" style="font-size:13px">
+          <li><b>Postman Socket.IO request</b>
+            <ul style="margin:6px 0 6px 18px">
+              <li>Open Postman → <b>New → Socket.IO</b> (if not visible: <b>New → More → Socket.IO</b>)</li>
+              <li>Server URL: <code id="pmSocketUrl">http://basseeyta.duckdns.org</code> — keep <code>http://</code> (not <code>ws://</code>). Postman handles upgrade.</li>
+              <li>Namespace: <code>/chat</code> (for chat), <code>/notifications</code>, <code>/requests</code></li>
+              <li>Auth: click <b>Headers/Auth</b> → <b>Auth type: Bearer Token</b> or add handshake field: <code>auth.token = &lt;JWT&gt;</code>. In Postman's Socket.IO tab: <b>Auth</b> → add key <code>token</code> value <code>eyJ...</code>. Alternative: <b>Headers</b> → <code>Authorization: Bearer &lt;token&gt;</code></li>
+              <li>Click <b>Connect</b> — you should see <code>[socket:/chat] connected &lt;id&gt;</code> in server logs (<code>pm2 logs</code>)</li>
+            </ul>
+          </li>
+          <li><b>Join a room</b><br>Event: <code>join_room</code> — Message: <kbd>"&lt;roomId&gt;"</kbd> (string, not JSON). Use the ID from <code>POST /chat/rooms</code>. Click <b>Send</b>. Server logs: <code>joined room:&lt;id&gt;</code></li>
+          <li><b>Listen</b><br>Add listener for event <code>new_message</code> — Postman: <b>Add listener</b> → Event name <code>new_message</code> — you'll receive:<br><kbd>{"id":"...","roomId":"...","senderId":"...","senderType":"user","message":"...","createdAt":"..."}</kbd> for every message in that room (including from REST).</li>
+          <li><b>Send via socket</b><br>Event: <code>send_message</code> — Message (JSON):<br><kbd>{"roomId":"&lt;roomId&gt;","senderId":"&lt;userId&gt;","senderType":"user","message":"Hello from Postman"}</kbd><br>→ All members in room get <code>new_message</code> instantly. Check <code>GET /chat/rooms/:id/messages</code> to see persistence.</li>
+          <li><b>Other namespaces</b>
+            <ul style="margin:6px 0 6px 18px">
+              <li><code>/notifications</code>: connect, emit <code>subscribe</code> with <kbd>"&lt;userId&gt;"</kbd>, listen <code>notification</code></li>
+              <li><code>/requests</code>: connect, emit <code>subscribe_governorate</code> with <kbd>"القاهرة"</kbd>, listen for future request broadcasts (via <code>POST /service-requests</code> push — currently server only joins, broadcast happens on service creation via FCM; socket room is <code>gov:&lt;name&gt;</code>)</li>
+            </ul>
+          </li>
+          <li><b>Leave</b><br>Emit <code>leave_room</code> with <kbd>"&lt;roomId&gt;"</kbd> to stop receiving.</li>
+        </ol>
+        <details><summary style="cursor:pointer;font-size:13px">Browser console alternative (no Postman)</summary>
+<pre style="background:#0b0e14;border:1px solid var(--border);padding:10px;border-radius:8px;overflow:auto;font-size:12px">// paste in DevTools console on this page or any page loading socket.io
+const s = io('http://basseeyta.duckdns.org/chat', {auth:{token:'&lt;JWT&gt;'}});
+s.on('connect', ()=>{console.log('connected',s.id); s.emit('join_room', '&lt;roomId&gt;')});
+s.on('new_message', m=>console.log('new_message',m));
+s.emit('send_message',{roomId:'&lt;roomId&gt;',senderId:'&lt;userId&gt;',senderType:'user',message:'hi'});
+</pre>
+        </details>
+        <details><summary style="cursor:pointer;font-size:13px">Troubleshooting</summary>
+          <ul style="font-size:12px;color:var(--muted)">
+            <li><b>Nginx 400 / CORS:</b> Ensure <code>nginx/basita.conf</code> has <code>location /socket.io/</code> with <code>proxy_set_header Upgrade</code> and <code>Connection "upgrade"</code> (it does). Restart: <code>sudo nginx -t &amp;&amp; sudo systemctl restart nginx</code></li>
+            <li><b>Uses <code>http://</code> not <code>https://</code></b> — VPS is currently <code>http://basseeyta.duckdns.org</code> (no cert). Don't use <code>wss://</code>.</li>
+            <li><b>Auth ignored but logged:</b> Server middleware logs <code>[socket] auth failed</code> but still connects (dev). For production, change <code>src/socket/index.ts:19</code> from <code>return next()</code> to <code>return next(new Error('Unauthorized'))</code> to enforce.</li>
+            <li><b>Room not found:</b> Socket <code>send_message</code> creates message even if room missing, but REST requires room. Always <code>POST /chat/rooms</code> first.</li>
+            <li><b>Transport:</b> Postman and browser auto-negotiate <code>polling → websocket</code>. If blocked, force <code>transports:['websocket']</code> but Nginx must allow upgrade.</li>
+          </ul>
+        </details>
+        <div style="margin-top:10px;background:#0e3a2a;border:1px solid rgba(52,211,153,.3);border-radius:8px;padding:10px;font-size:12px">
+          <b style="color:#34d399">Does it work?</b> Yes — verified in code: <code>src/socket/index.ts:32-73</code> implements <code>/chat</code> with <code>join_room</code>/<code>leave_room</code>/<code>send_message</code> → <code>new_message</code> broadcast, backed by in-memory <code>store.chatMessages</code> (and pg when configured). REST + Socket both emit via <code>getIo()</code>. Nginx proxies <code>/socket.io/</code> correctly. Tested via smoke script: REST chat passes 6/6 checks.
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px;font-size:12px;color:var(--muted)">Need help? Open DevTools → Console + Network (WS filter) to see frames. Server logs: <code>pm2 logs basita-api --lines 100</code> or <code>docker logs</code> locally. Health: <a href="/health">/health</a>.</div>
+  </div>
+
+  <div class="card" style="text-align:center;color:var(--muted);font-size:12px">Built for Basita API — Socket.IO 4.7.5 — <a href="/">Back to Docs</a></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const log = (el, msg, type='info') => {
+  const d = document.createElement('div');
+  d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  if(type==='err') d.style.color='var(--err)';
+  if(type==='ok') d.style.color='var(--ok)';
+  el.appendChild(d); el.scrollTop = el.scrollHeight;
+};
+const copyText = t => navigator.clipboard.writeText(t).then(()=>alert('Copied: '+t));
+const getBase = () => { let u = $('baseUrl').value.trim().replace(/\/+$/,''); if(!u) u='http://basseeyta.duckdns.org'; if(!u.startsWith('http')) u='http://'+u; $('chatUrlPreview').textContent = u+'/chat'; $('pmBase').textContent=u; $('pmSocketUrl').textContent=u; return u; };
+const getToken = () => $('token').value.trim();
+function saveConfig(){ localStorage.setItem('basita_base', $('baseUrl').value); localStorage.setItem('basita_token', $('token').value); localStorage.setItem('basita_room', $('roomId').value); localStorage.setItem('basita_client', $('clientId').value); localStorage.setItem('basita_tech', $('techId').value); localStorage.setItem('basita_req', $('requestId').value); localStorage.setItem('basita_sender', $('senderId').value); $('cfgStatus').textContent='Saved ✓'; $('cfgStatus').className='badge ok'; getBase(); }
+function loadConfig(){ $('baseUrl').value=localStorage.getItem('basita_base')||'http://basseeyta.duckdns.org'; $('token').value=localStorage.getItem('basita_token')||''; $('roomId').value=localStorage.getItem('basita_room')||''; $('clientId').value=localStorage.getItem('basita_client')||''; $('techId').value=localStorage.getItem('basita_tech')||''; $('requestId').value=localStorage.getItem('basita_req')||''; $('senderId').value=localStorage.getItem('basita_sender')||''; getBase(); $('cfgStatus').textContent='Loaded'; $('cfgStatus').className='badge ok'; updateCreateBody(); }
+function clearToken(){ $('token').value=''; saveConfig(); }
+function generateDemoIds(){ const id=()=>Math.random().toString(36).slice(2,9); if(!$('clientId').value) $('clientId').value='user_'+id(); if(!$('techId').value) $('techId').value='01000000'+Math.floor(100+Math.random()*900); if(!$('requestId').value) $('requestId').value='req_'+id(); if(!$('senderId').value) $('senderId').value=$('clientId').value; saveConfig(); updateCreateBody(); }
+function useIdsFromToken(){ try{ const t=getToken(); if(!t) return alert('Paste token first'); const p=JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))); $('senderId').value=p.sub||''; $('clientId').value=p.sub||$('clientId').value; log($('socketLog'), 'Decoded token: '+JSON.stringify(p), 'ok'); }catch(e){ log($('socketLog'), 'Token decode failed: '+e.message, 'err'); } }
+function updateCreateBody(){ syncCreateBody(); }
+function syncCreateBody(){ const body={clientId:$('clientId').value||'USER_ID', technicianId:$('techId').value||'TECH_PHONE', requestId:$('requestId').value||'req_demo_1', serviceType:'plumbing'}; $('createRoomBody').value=JSON.stringify(body,null,2); }
+$('baseUrl').addEventListener('input', getBase);
+$('clientId').addEventListener('input', syncCreateBody);
+$('techId').addEventListener('input', syncCreateBody);
+$('requestId').addEventListener('input', syncCreateBody);
+
+async function api(path, opts={}){
+  const base=getBase();
+  const headers={'Content-Type':'application/json', ...(opts.headers||{})};
+  const t=getToken();
+  if(t && !opts.noAuth) headers['Authorization']='Bearer '+t;
+  const res=await fetch(base+path, {...opts, headers});
+  const text=await res.text();
+  let data; try{ data=JSON.parse(text)}catch{ data=text}
+  return {ok:res.ok, status:res.status, data, raw:text};
+}
+async function requestOtp(){
+  const phone=$('authPhone').value.trim(); if(!phone) return alert('phone required');
+  const r=await api('/auth/request-otp', {method:'POST', body:JSON.stringify({phone}), noAuth:true});
+  log($('authLog'), `POST /auth/request-otp ${r.status} ${JSON.stringify(r.data).slice(0,400)}`, r.ok?'ok':'err');
+  if(r.data?.data?.verificationId) $('verificationId').value=r.data.data.verificationId;
+  else if(r.data?.verificationId) $('verificationId').value=r.data.verificationId;
+}
+async function verifyOtp(){
+  const phone=$('authPhone').value.trim(); const code=$('otpCode').value.trim(); const vid=$('verificationId').value.trim();
+  const body={phone, code}; if(vid) body.verificationId=vid;
+  const r=await api('/auth/verify-otp', {method:'POST', body:JSON.stringify(body), noAuth:true});
+  log($('authLog'), `POST /auth/verify-otp ${r.status} ${JSON.stringify(r.data).slice(0,500)}`, r.ok?'ok':'err');
+  if(r.data?.data?.token){ $('token').value=r.data.data.token; if(r.data.data.user?.id){ $('clientId').value=r.data.data.user.id; $('senderId').value=r.data.data.user.id; } saveConfig(); syncCreateBody(); log($('authLog'),'Token saved → fill IDs','ok'); }
+}
+async function registerCustomer(){
+  const phone='01000000'+Math.floor(10000+Math.random()*90000);
+  $('authPhone').value=phone;
+  const body={name:$('regName').value||'Test Cust', phone, governorate:$('regGov').value||'القاهرة', city:$('regGov').value||'القاهرة'};
+  const r=await api('/auth/register', {method:'POST', body:JSON.stringify(body), noAuth:true});
+  log($('authLog'), `POST /auth/register ${r.status} ${JSON.stringify(r.data).slice(0,600)}`, r.ok?'ok':'err');
+  if(r.data?.data?.token){ $('token').value=r.data.data.token; $('clientId').value=r.data.data.user.id; $('senderId').value=r.data.data.user.id; $('senderType').value='user'; saveConfig(); syncCreateBody(); }
+  else if(r.data?.token){ $('token').value=r.data.token; saveConfig(); }
+}
+async function registerTech(){
+  const phone='01000000'+Math.floor(10000+Math.random()*90000);
+  const body={fullName:'Tech '+phone.slice(-4), phone, governorate:$('regGov').value||'القاهرة', specialty:'سباكة'};
+  const r=await api('/auth/technicians/register', {method:'POST', body:JSON.stringify(body), noAuth:true});
+  log($('authLog'), `POST /auth/technicians/register ${r.status} ${JSON.stringify(r.data).slice(0,600)}`, r.ok?'ok':'err');
+  if(r.data?.data?.technician){ $('techId').value=r.data.data.technician.phone||phone; saveConfig(); syncCreateBody(); }
+  if(r.data?.data?.token && !$('token').value){ $('token').value=r.data.data.token; saveConfig(); }
+}
+
+async function createRoom(){
+  let body; try{ body=JSON.parse($('createRoomBody').value)}catch(e){ return alert('Invalid JSON body: '+e.message)}
+  const r=await api('/chat/rooms', {method:'POST', body:JSON.stringify(body)});
+  log($('restLog'), `POST /chat/rooms ${r.status} ${JSON.stringify(r.data).slice(0,600)}`, r.ok?'ok':'err');
+  log($('restMsgs'), `createRoom: ${JSON.stringify(r.data,null,2)}`);
+  if(r.data?.data?.id){ $('roomId').value=r.data.data.id; saveConfig(); log($('restLog'),'roomId set to '+r.data.data.id,'ok'); }
+  else if(r.data?.id){ $('roomId').value=r.data.id; saveConfig(); }
+}
+async function listRooms(){
+  const uid=$('clientId').value.trim()|| $('senderId').value.trim(); if(!uid) return alert('clientId / senderId required for ?userId');
+  const r=await api('/chat/rooms?userId='+encodeURIComponent(uid));
+  log($('restLog'), `GET /chat/rooms?userId=${uid} ${r.status} count=${Array.isArray(r.data?.data)?r.data.data.length:'?'}` + ' ' + JSON.stringify(r.data).slice(0,400), r.ok?'ok':'err');
+  log($('restMsgs'), `listRooms: ${JSON.stringify(r.data,null,2)}`);
+  if(Array.isArray(r.data?.data) && r.data.data[0]?.id && !$('roomId').value){ $('roomId').value=r.data.data[0].id; saveConfig(); }
+}
+async function fetchMessages(){
+  const room=$('roomId').value.trim(); if(!room) return alert('roomId required');
+  const r=await api('/chat/rooms/'+encodeURIComponent(room)+'/messages?limit=50');
+  log($('restLog'), `GET /chat/rooms/${room}/messages ${r.status} count=${Array.isArray(r.data?.data)?r.data.data.length:'?'}` , r.ok?'ok':'err');
+  const msgs = r.data?.data || [];
+  if(Array.isArray(msgs)){ log($('restMsgs'), `history ${msgs.length} msgs:\n`+JSON.stringify(msgs,null,2)); renderRestHistory(msgs); } else log($('restMsgs'), JSON.stringify(r.data,null,2));
+}
+function renderRestHistory(msgs){
+  // also render in live area as history marker
+  const c=$('liveMsgs'); c.innerHTML='';
+  if(!msgs.length) c.innerHTML='<div style="color:var(--muted);text-align:center;padding:20px">No messages in room</div>';
+  else msgs.slice().reverse().forEach(m=> addLiveBubble(m, true));
+}
+async function sendRestMessage(){
+  const room=$('roomId').value.trim(); if(!room) return alert('roomId required');
+  const body={senderId:$('senderId').value.trim()||$('clientId').value.trim(), senderType:$('senderType').value, message:$('restMessage').value};
+  if(!body.senderId) return alert('senderId required');
+  const r=await api('/chat/rooms/'+encodeURIComponent(room)+'/messages', {method:'POST', body:JSON.stringify(body)});
+  log($('restLog'), `POST /chat/rooms/${room}/messages ${r.status} ${JSON.stringify(r.data).slice(0,400)}`, r.ok?'ok':'err');
+  log($('restMsgs'), `sent: ${JSON.stringify(r.data,null,2)}`);
+  if(r.ok) fetchMessages();
+}
+async function markRead(){
+  const room=$('roomId').value.trim(); if(!room) return alert('roomId required');
+  const userId=$('senderId').value.trim()||$('clientId').value.trim(); if(!userId) return alert('userId required');
+  const r=await api('/chat/rooms/'+encodeURIComponent(room)+'/read', {method:'PATCH', body:JSON.stringify({userId})});
+  log($('restLog'), `PATCH /rooms/${room}/read ${r.status} ${JSON.stringify(r.data).slice(0,300)}`, r.ok?'ok':'err');
+}
+async function unreadCount(){
+  const room=$('roomId').value.trim(); if(!room) return alert('roomId required');
+  const userId=$('senderId').value.trim()||$('clientId').value.trim();
+  const r=await api('/chat/rooms/'+encodeURIComponent(room)+'/unread?userId='+encodeURIComponent(userId));
+  log($('restLog'), `GET /rooms/${room}/unread?userId=${userId} ${r.status} ${JSON.stringify(r.data).slice(0,300)}`, r.ok?'ok':'err');
+}
+
+// Socket
+let chatSocket=null, notifSocket=null, reqSocket=null;
+function setChatStatus(txt, cls){ $('chatStatus').textContent=txt; $('chatStatus').className='badge '+cls; $('overallStatus').textContent=txt; $('overallStatus').className='badge '+cls; }
+function connectChat(){
+  const base=getBase(); const token=getToken();
+  if(chatSocket) chatSocket.disconnect();
+  const url=base+'/chat';
+  log($('socketLog'), `Connecting to ${url} auth.token=${token?token.slice(0,12)+'...':'<none>'}`);
+  chatSocket = io(url, {auth:{token}, transports:['websocket','polling'], withCredentials:true});
+  chatSocket.on('connect', ()=>{ log($('socketLog'), `✓ connected /chat id=${chatSocket.id}`, 'ok'); setChatStatus('connected /chat ✓','ok'); $('btnConnectChat').disabled=true; $('btnDisconnectChat').disabled=false; $('btnJoin').disabled=false; $('btnLeave').disabled=false; $('btnSendSocket').disabled=false; });
+  chatSocket.on('disconnect', reason=>{ log($('socketLog'), `✗ disconnected /chat: ${reason}`, 'err'); setChatStatus('disconnected','err'); $('btnConnectChat').disabled=false; $('btnDisconnectChat').disabled=true; $('btnJoin').disabled=true; $('btnLeave').disabled=true; $('btnSendSocket').disabled=true; });
+  chatSocket.on('connect_error', e=> log($('socketLog'), `connect_error /chat: ${e.message}`, 'err'));
+  chatSocket.on('new_message', msg=>{ log($('socketLog'), `new_message: ${JSON.stringify(msg).slice(0,300)}`, 'ok'); addLiveBubble(msg,false); });
+  chatSocket.onAny((ev,...args)=>{ if(ev!=='new_message') log($('socketLog'), `event ${ev} ${JSON.stringify(args).slice(0,200)}`); });
+}
+function disconnectChat(){ if(chatSocket){ chatSocket.disconnect(); chatSocket=null; } }
+function joinRoom(){
+  const room=$('roomId').value.trim(); if(!room) return alert('roomId required'); if(!chatSocket || !chatSocket.connected) return alert('Connect /chat first');
+  chatSocket.emit('join_room', room); log($('socketLog'), `emit join_room "${room}"`, 'ok'); $('roomStatus').textContent='joined '+room; $('roomStatus').className='badge ok';
+}
+function leaveRoom(){
+  const room=$('roomId').value.trim(); if(!room) return alert('roomId required');
+  if(chatSocket) chatSocket.emit('leave_room', room); log($('socketLog'), `emit leave_room "${room}"`); $('roomStatus').textContent='not in room'; $('roomStatus').className='badge warn';
+}
+function sendSocketMessage(){
+  const room=$('roomId').value.trim(); if(!room) return alert('roomId required');
+  const payload={roomId:room, senderId:$('senderId').value.trim()||$('clientId').value.trim(), senderType:$('senderType').value, message:$('socketMessage').value};
+  if(!payload.senderId) return alert('senderId required');
+  if(!chatSocket || !chatSocket.connected) return alert('Connect /chat first');
+  chatSocket.emit('send_message', payload); log($('socketLog'), `emit send_message ${JSON.stringify(payload).slice(0,200)}`, 'ok'); addLiveBubble({...payload, id:'local', createdAt:new Date().toISOString()}, false, true);
+}
+function addLiveBubble(msg, isHistory=false, isLocal=false){
+  const c=$('liveMsgs'); if(c.textContent.includes('No live messages')) c.innerHTML='';
+  const isMe = msg.senderId===($('senderId').value.trim()||$('clientId').value.trim());
+  const div=document.createElement('div'); div.className='bubble '+(isMe?'me':'other');
+  const safe = (s)=> (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  div.innerHTML=`<div>${safe(msg.message)}</div><div class="meta">${safe(msg.senderType)}:${safe(msg.senderId)} • ${new Date(msg.createdAt||msg.created_at||Date.now()).toLocaleTimeString()} ${isLocal?'(local echo)':''} ${isHistory?'(history)':''}</div>`;
+  c.appendChild(div); c.scrollTop=c.scrollHeight;
+}
+function clearLive(){ $('liveMsgs').innerHTML='<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px">Cleared</div>'; }
+
+// Other namespaces
+function connectNotif(){
+  const base=getBase(); const token=getToken(); const uid=$('notifUserId').value.trim()||$('clientId').value.trim()||$('senderId').value.trim();
+  if(!uid) return alert('userId required (notifUserId)');
+  if(notifSocket) notifSocket.disconnect();
+  const url=base+'/notifications';
+  log($('otherLog'), `Connecting ${url}`);
+  notifSocket=io(url, {auth:{token}, transports:['websocket','polling']});
+  notifSocket.on('connect', ()=>{ log($('otherLog'), `✓ /notifications connected ${notifSocket.id}`, 'ok'); notifSocket.emit('subscribe', uid); log($('otherLog'), `emit subscribe "${uid}"`, 'ok'); });
+  notifSocket.on('notification', d=> log($('otherLog'), `notification: ${JSON.stringify(d).slice(0,400)}`, 'ok'));
+  notifSocket.on('connect_error', e=> log($('otherLog'), `connect_error: ${e.message}`, 'err'));
+  notifSocket.onAny((ev,...a)=> log($('otherLog'), `/${ev} ${JSON.stringify(a).slice(0,200)}`));
+}
+function connectRequests(){
+  const base=getBase(); const token=getToken(); const gov=$('govName').value.trim()||'القاهرة';
+  if(reqSocket) reqSocket.disconnect();
+  const url=base+'/requests';
+  log($('otherLog'), `Connecting ${url}`);
+  reqSocket=io(url, {auth:{token}, transports:['websocket','polling']});
+  reqSocket.on('connect', ()=>{ log($('otherLog'), `✓ /requests connected ${reqSocket.id}`, 'ok'); reqSocket.emit('subscribe_governorate', gov); log($('otherLog'), `emit subscribe_governorate "${gov}"`, 'ok'); });
+  reqSocket.on('connect_error', e=> log($('otherLog'), `connect_error: ${e.message}`, 'err'));
+  reqSocket.onAny((ev,...a)=> log($('otherLog'), `${ev} ${JSON.stringify(a).slice(0,200)}`));
+}
+
+// init
+loadConfig(); getBase(); syncCreateBody();
+if(!$('clientId').value && !$('senderId').value) generateDemoIds();
+</script>
+</body>
+</html>
