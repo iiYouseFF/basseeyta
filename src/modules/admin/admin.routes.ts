@@ -7,8 +7,11 @@ import { authMiddleware, requireAdmin } from '../../middleware/auth';
 import { signJwt } from '../../utils/jwt';
 import { store, genId, nowIso } from '../../utils/store';
 import { env } from '../../config/env';
-import { getPool } from '../../config/supabase';
+import { getPool, getSupabase } from '../../config/supabase';
 import { logger } from '../../utils/logger';
+import { isJob, executeJob, recordJobRun, listJobStatus } from '../../jobs/runner';
+import { listStorageFiles, removeStorageFile, ALLOWED_BUCKETS } from '../storage/storage.routes';
+import { getMessaging } from '../../config/firebase';
 
 const router = Router();
 
@@ -333,6 +336,18 @@ router.get('/audit-logs', async (req: any, res) => {
 
 // Stats
 router.get('/stats', async (_req: any, res) => {
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const monthKey = todayKey.slice(0, 7);
+  const completedPayments = Array.from(store.paymentLogs.values()).filter((p: any) => p.status === 'completed');
+  const payDate = (p: any) => p.createdAt || p.created_at || p.paid_at || p.paidAt || '';
+  const revenueToday = completedPayments.filter((p: any) => payDate(p).startsWith(todayKey)).reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
+  const revenueMonth = completedPayments.filter((p: any) => payDate(p).startsWith(monthKey)).reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
+  const todayActiveRequests = Array.from(store.serviceRequests.values()).filter(
+    (r: any) => (r.createdAt || r.created_at || '').startsWith(todayKey) && ['accepted', 'in_progress', 'offer_submitted'].includes(r.status)
+  ).length;
+  const aiUsageToday = store.aiUsage.filter((a: any) => (a.createdAt || '').startsWith(todayKey)).length;
+  const aiUsageMonth = store.aiUsage.filter((a: any) => (a.createdAt || '').startsWith(monthKey)).length;
+  const aiUsageTotal = store.aiUsage.length;
   // Prefer store counts (always available) — DB as supplement if pool exists we still use store for consistency unless DB wanted
   try {
     const pool = getPool();
@@ -377,6 +392,12 @@ router.get('/stats', async (_req: any, res) => {
         pendingPayments: Array.from(store.paymentLogs.values()).filter((p: any) => p.status === 'pending').length,
         totalEarnings: Array.from(store.paymentLogs.values()).filter((p: any) => p.status === 'completed').reduce((s: number, p: any) => s + Number(p.amount || 0), 0),
         todayRequests: Array.from(store.serviceRequests.values()).filter((r: any) => (r.createdAt || r.created_at || '').startsWith(new Date().toISOString().slice(0, 10))).length,
+        todayActiveRequests,
+        revenueToday,
+        revenueMonth,
+        aiUsageToday,
+        aiUsageMonth,
+        aiUsageTotal,
       };
       // Status breakdown for requests
       const byStatus: Record<string, number> = {};
@@ -413,6 +434,12 @@ router.get('/stats', async (_req: any, res) => {
     pendingPayments: Array.from(store.paymentLogs.values()).filter((p: any) => p.status === 'pending').length,
     totalEarnings: Array.from(store.paymentLogs.values()).filter((p: any) => p.status === 'completed').reduce((s: number, p: any) => s + Number(p.amount || 0), 0),
     todayRequests: Array.from(store.serviceRequests.values()).filter((r: any) => (r.createdAt || r.created_at || '').startsWith(new Date().toISOString().slice(0, 10))).length,
+    todayActiveRequests,
+    revenueToday,
+    revenueMonth,
+    aiUsageToday,
+    aiUsageMonth,
+    aiUsageTotal,
     requestsByStatus: byStatus,
   };
   await addAuditLog(_req, 'view', 'stats', undefined, { at: nowIso() });
@@ -762,10 +789,46 @@ router.get('/transactions', async (req: any, res) => {
 });
 router.get('/instapay', async (req: any, res) => {
   const { page, limit } = parsePagination(req);
+  const status = (req.query.status as string) || '';
   let arr = Array.from(store.instapay.values());
+  if (status) arr = arr.filter((r: any) => r.status === status);
+  arr = arr.map((r: any) => {
+    const request = r.requestId ? store.serviceRequests.get(r.requestId) : undefined;
+    const orderTotal = request ? Number(request.final_price ?? request.finalPrice ?? request.accepted_price ?? request.budget ?? 0) : 0;
+    const tech = r.technicianId ? store.technicians.get(r.technicianId) : undefined;
+    const user = store.users.get(r.userId);
+    return {
+      ...r,
+      technicianName: tech?.full_name || tech?.fullName || tech?.name || '',
+      userName: user?.name || '',
+      orderTotal,
+      expectedCommission: Math.round(orderTotal * 0.075 * 100) / 100,
+      mismatch: orderTotal > 0 && Math.abs(Number(r.amount || 0) - Math.round(orderTotal * 0.075 * 100) / 100) > 1,
+    };
+  });
   arr.sort((a: any, b: any) => new Date(b.createdAt || b.created_at || 0).getTime() - new Date(a.createdAt || a.created_at || 0).getTime());
   const { data, total, totalPages } = paginate(arr, page, limit);
+  // Only expose verification_code to admins (already admin-only), pending/closed split for dashboard
   return res.json({ success: true, data, total, page, limit, totalPages });
+});
+router.post('/instapay/:id/confirm', async (req: any, res) => {
+  const record = store.instapay.get(req.params.id);
+  if (!record) return sendError(res, 404, 'InstaPay transaction not found');
+  if (record.status === 'verified') return sendError(res, 409, 'Already verified');
+  const now = nowIso();
+  record.status = 'verified';
+  record.verifiedAt = now;
+  record.verified_at = now;
+  record.verifiedBy = (req as any).user?.email || '';
+  record.closedAt = now;
+  record.closed_at = now;
+  store.instapay.set(req.params.id, record);
+  await addAuditLog(req, 'confirm', 'instapay', record.id, { amount: record.amount, technicianId: record.technicianId, cause: 'admin_received_commission' });
+  try {
+    const pool = getPool();
+    if (pool) await pool.query(`UPDATE instapay SET status=$1, verified_at=now(), closed_at=now() WHERE id=$2`, ['verified', record.id]);
+  } catch {}
+  return sendSuccess(res, record);
 });
 router.get('/payment-cards', async (req: any, res) => {
   const { page, limit } = parsePagination(req);
@@ -1126,6 +1189,203 @@ router.delete('/search-index/:key', async (req: any, res) => {
   store.searchIndex.delete(k);
   await addAuditLog(req, 'delete', 'search_index', k, {});
   return sendSuccess(res, { deleted: k });
+});
+
+// ---------- Jobs / Cron Monitor ----------
+router.get('/jobs', async (req: any, res) => {
+  const jobs = listJobStatus();
+  await addAuditLog(req, 'view', 'jobs', undefined, { count: jobs.length });
+  return res.json({ success: true, data: jobs, total: jobs.length });
+});
+
+router.post('/jobs/:name/run', async (req: any, res) => {
+  const name = req.params.name;
+  if (!isJob(name)) return sendError(res, 400, `Unknown job ${name}`);
+  try {
+    const { getCronQueue } = require('../../jobs/queue');
+    const queue = getCronQueue();
+    if (queue) {
+      await queue.add(name, {}, { delay: 0 });
+      recordJobRun(name, 'queued');
+      await addAuditLog(req, 'run', 'jobs', name, { mode: 'queue' });
+      return sendSuccess(res, { queued: name, job: listJobStatus().find((j: any) => j.name === name) });
+    }
+  } catch {}
+  const result = await executeJob(name);
+  await addAuditLog(req, 'run', 'jobs', name, { mode: 'in-memory', detail: result.detail });
+  return sendSuccess(res, { executed: name, detail: result.detail, job: listJobStatus().find((j: any) => j.name === name) });
+});
+
+// ---------- Storage Browser ----------
+router.get('/storage/:bucket', async (req: any, res) => {
+  const bucket = req.params.bucket;
+  if (!ALLOWED_BUCKETS.includes(bucket as any)) return sendError(res, 400, `bucket must be one of ${ALLOWED_BUCKETS.join(',')}`);
+  const { page, limit } = parsePagination(req);
+  const files = await listStorageFiles(bucket);
+  const publicBucket = bucket === 'profiles' || bucket === 'community_posts';
+  const supabase = getSupabase();
+  const withUrls = await Promise.all(
+    files.map(async (f) => {
+      let url: string | null = null;
+      if (supabase) {
+        if (publicBucket) url = `${env.STORAGE_CDN_BASE}/${bucket}/${f.name}`;
+        else {
+          try {
+            const { data } = await supabase.storage.from(bucket).createSignedUrl(f.name, 3600);
+            url = data?.signedUrl || null;
+          } catch { url = null; }
+        }
+      } else {
+        url = publicBucket ? `${env.STORAGE_CDN_BASE}/${bucket}/${f.name}` : `http://localhost:${env.PORT}/storage/${bucket}/${f.name}?token=mock-signed`;
+      }
+      return { ...f, bucket, url, public: publicBucket };
+    })
+  );
+  const { data, total, totalPages } = paginate(withUrls, page, limit);
+  await addAuditLog(req, 'view', 'storage', undefined, { bucket, total });
+  return res.json({ success: true, data, total, page, limit, totalPages, bucket, public: publicBucket });
+});
+
+router.delete('/storage/:bucket/:path(*)', async (req: any, res) => {
+  const bucket = req.params.bucket;
+  const path = req.params.path as string;
+  if (!ALLOWED_BUCKETS.includes(bucket as any)) return sendError(res, 400, 'Invalid bucket');
+  const ok = await removeStorageFile(bucket, path);
+  if (!ok) return sendError(res, 404, 'File not found');
+  await addAuditLog(req, 'delete', 'storage', `${bucket}/${path}`, {});
+  return sendSuccess(res, { deleted: `${bucket}/${path}` });
+});
+
+// ---------- AI Usage Log ----------
+router.get('/ai-usage', async (req: any, res) => {
+  const { page, limit } = parsePagination(req);
+  const arr = [...store.aiUsage].reverse();
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const monthKey = todayKey.slice(0, 7);
+  const today = arr.filter((a: any) => (a.createdAt || '').startsWith(todayKey));
+  const month = arr.filter((a: any) => (a.createdAt || '').startsWith(monthKey));
+  const totals = {
+    total: arr.length,
+    today: today.length,
+    month: month.length,
+    mockToday: today.filter((a: any) => a.mock).length,
+    mockMonth: month.filter((a: any) => a.mock).length,
+  };
+  const { data, total, totalPages } = paginate(arr, page, limit);
+  await addAuditLog(req, 'view', 'ai_usage', undefined, { total });
+  return res.json({ success: true, data, total, page, limit, totalPages, totals });
+});
+
+// ---------- Search index re-index (rebuild in-memory index from current data) ----------
+router.post('/search/reindex', async (req: any, res) => {
+  let built = 0;
+  const set = (et: string, eid: string, title: string, description: string, governorate: string, specialty: string) => {
+    if (!eid || !title) return;
+    store.searchIndex.set(`${et}:${eid}`, { entity_type: et, entity_id: eid, title, description: description || '', governorate: governorate || '', specialty: specialty || '' });
+    built++;
+  };
+  for (const u of store.users.values()) set('user', u.id, u.name || u.phone, '', u.governorate || '', '');
+  for (const t of store.technicians.values()) set('technician', t.phone || t.id, t.full_name || t.fullName || t.name || t.phone, '', t.governorate || '', t.specialty || '');
+  for (const r of store.serviceRequests.values()) set('service_request', r.id, r.title || '', r.description || '', r.userGovernorate || r.user_governorate || '', r.serviceType || r.service_type || '');
+  try {
+    const pool = getPool();
+    if (pool) {
+      const rows = await pool.query('SELECT entity_type, entity_id, title, description, governorate, specialty FROM search_index');
+      for (const row of rows.rows) set(row.entity_type, row.entity_id, row.title, row.description, row.governorate, row.specialty);
+    }
+  } catch {}
+  await addAuditLog(req, 'rebuild', 'search_index', undefined, { built });
+  return sendSuccess(res, { rebuilt: built, total: store.searchIndex.size });
+});
+
+// ---------- Push Notifications (compose / broadcast) ----------
+router.post('/push/send', async (req: any, res) => {
+  const schema = z.object({
+    target: z.enum(['all', 'userType', 'governorate', 'user']),
+    userType: z.enum(['user', 'technician']).optional(),
+    governorate: z.string().optional(),
+    userId: z.string().optional(),
+    title: z.string().min(1).max(120),
+    body: z.string().min(1).max(1000),
+    type: z.string().optional(),
+    data: z.record(z.any()).optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return sendError(res, 400, 'Invalid push data', parsed.error.errors);
+
+  const pushType = parsed.data.userType || 'user';
+  const gov = parsed.data.governorate || '';
+  const recipients = new Map<string, { token: string; userType: string }>();
+  if (parsed.data.target === 'user') {
+    if (!parsed.data.userId) return sendError(res, 400, 'userId required for target=user');
+    const u = store.users.get(parsed.data.userId);
+    const t = store.technicians.get(parsed.data.userId);
+    if (!u && !t) return sendError(res, 404, 'User not found');
+    if (u?.fcmToken) recipients.set(parsed.data.userId, { token: u.fcmToken, userType: 'user' });
+    if (t?.fcmToken) recipients.set(parsed.data.userId, { token: t.fcmToken, userType: 'technician' });
+  } else if (parsed.data.target === 'all') {
+    for (const u of store.users.values()) if (u.fcmToken) recipients.set(u.id, { token: u.fcmToken, userType: 'user' });
+    for (const t of store.technicians.values()) if (t.fcmToken) recipients.set(t.id, { token: t.fcmToken, userType: 'technician' });
+  } else if (parsed.data.target === 'userType') {
+    const src = pushType === 'technician' ? store.technicians : store.users;
+    for (const u of src.values()) {
+      const id = (u as any).id || (u as any).phone;
+      if (u.fcmToken && id) recipients.set(id, { token: u.fcmToken, userType: pushType });
+    }
+  } else if (parsed.data.target === 'governorate') {
+    for (const u of store.users.values()) if (u.governorate === gov && u.fcmToken) recipients.set(u.id, { token: u.fcmToken, userType: 'user' });
+    for (const t of store.technicians.values()) if (t.governorate === gov && t.fcmToken) recipients.set(t.id, { token: t.fcmToken, userType: 'technician' });
+  }
+
+  const now = nowIso();
+  let created = 0;
+  for (const [userId, r] of recipients.entries()) {
+    const id = genId();
+    store.notifications.set(id, {
+      id,
+      userId,
+      userType: r.userType,
+      title: parsed.data.title,
+      body: parsed.data.body,
+      type: parsed.data.type || 'admin_push',
+      data: parsed.data.data || {},
+      isRead: false,
+      createdAt: now,
+      created_at: now,
+    });
+    created++;
+  }
+  // If no fcm tokens exist, still notify sockets so clients receive a live broadcast
+  const payload = { title: parsed.data.title, body: parsed.data.body };
+  try {
+    const { getIo } = require('../../socket');
+    const io = getIo();
+    if (io) io.of('/notifications').emit('admin:push', { ...payload, type: parsed.data.type || 'admin_push' });
+  } catch {}
+  const messaging = getMessaging();
+  let fcmSent = 0;
+  if (messaging) {
+    if (parsed.data.target !== 'user') {
+      try {
+        const topic = parsed.data.target === 'all' ? 'all_users' : parsed.data.target === 'userType' ? `push_${pushType}` : `gov_${gov}`;
+        const msg: any = { notification: payload, data: parsed.data.data ? Object.fromEntries(Object.entries(parsed.data.data).map(([k, v]) => [k, String(v)])) : undefined };
+        if (topic) { msg.topic = topic; await messaging.send(msg); }
+        fcmSent = topic ? created : 0;
+      } catch (e: any) {
+        console.warn('[admin-push] FCM topic failed', e.message);
+        fcmSent = 0;
+      }
+    } else {
+      for (const r of recipients.values()) {
+        try {
+          await messaging.send({ token: r.token, notification: payload, data: parsed.data.data ? Object.fromEntries(Object.entries(parsed.data.data).map(([k, v]) => [k, String(v)])) : undefined });
+          fcmSent++;
+        } catch { /* skip failed token */ }
+      }
+    }
+  }
+  await addAuditLog(req, 'create', 'push_notifications', undefined, { target: parsed.data.target, recipients: created, fcm: fcmSent, title: payload.title });
+  return sendSuccess(res, { recipients: created, fcm: fcmSent, messaging: !!messaging, target: parsed.data.target });
 });
 
 export default router;

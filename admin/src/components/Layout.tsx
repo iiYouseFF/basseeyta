@@ -26,7 +26,7 @@ const sections: { title: string; items: { label: string; to: string; icon: strin
       { label: 'Payments', to: '/admin/payments', icon: '₹' },
       { label: 'Transactions', to: '/admin/transactions', icon: '⇄' },
       { label: 'Promo Codes', to: '/admin/promos', icon: '🏷' },
-      { label: 'InstaPay', to: '/admin/instapay', icon: '⚡' },
+      { label: 'InstaPay Console', to: '/admin/instapay', icon: '⚡' },
     ],
   },
   {
@@ -38,7 +38,15 @@ const sections: { title: string; items: { label: string; to: string; icon: strin
       { label: 'Notifications', to: '/admin/notifications', icon: '🔔' },
     ],
   },
-  { title: 'System', items: [{ label: 'Admins', to: '/admin/admins', icon: '🛡️' }, { label: 'Families', to: '/admin/families', icon: '👪' }, { label: 'Search Index', to: '/admin/search', icon: '⌕' }] },
+  {
+    title: 'Automation & AI',
+    items: [
+      { label: 'Push', to: '/admin/push', icon: '✉' },
+      { label: 'Jobs / Cron', to: '/admin/jobs', icon: '⚙' },
+      { label: 'AI Usage', to: '/admin/ai', icon: '≋' },
+    ],
+  },
+  { title: 'System', items: [{ label: 'Admins', to: '/admin/admins', icon: '🛡️' }, { label: 'Families', to: '/admin/families', icon: '👪' }, { label: 'Search Index', to: '/admin/search', icon: '⌕' }, { label: 'Storage', to: '/admin/storage', icon: '🗄' }] },
 ];
 
 export function Layout({ children, title, subtitle }: { children: React.ReactNode; title?: string; subtitle?: string }) {

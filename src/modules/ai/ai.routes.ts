@@ -4,8 +4,24 @@ import { sendSuccess, sendError } from '../../utils/response';
 import { authMiddleware } from '../../middleware/auth';
 import { aiRateLimit } from '../../middleware/rateLimit';
 import { env } from '../../config/env';
+import { store, genId, nowIso } from '../../utils/store';
 
 const router = Router();
+
+function logAiUsage(req: any, query: string, reply: string, mock: boolean, error?: string) {
+  try {
+    store.aiUsage.push({
+      id: genId(),
+      userId: req?.user?.id || '',
+      governorate: req?.body?.userContext?.governorate || '',
+      query,
+      reply,
+      mock,
+      error: error || null,
+      createdAt: nowIso(),
+    });
+  } catch {}
+}
 
 router.post('/assistant', authMiddleware, aiRateLimit, async (req, res) => {
   const schema = z.object({
@@ -24,6 +40,7 @@ router.post('/assistant', authMiddleware, aiRateLimit, async (req, res) => {
   // If no OpenAI key, return mock
   if (!env.OPENAI_API_KEY || env.OPENAI_API_KEY === '...' || env.OPENAI_API_KEY.length < 10) {
     const mockReply = `أهلاً بك! في ${governorate}، مشكلتك "${parsed.data.query}" قد تكلف تقريباً 300-600 ج.م حسب الخدمة (سباكة، كهرباء، نقاشة، نجارة، تكييف). أنصحك بإنشاء طلب خدمة ليتواصل معك فني مختص. هل تريد إنشاء طلب الآن؟`;
+    logAiUsage(req, parsed.data.query, mockReply, true);
     return sendSuccess(res, { reply: mockReply, mock: true });
   }
 
@@ -40,11 +57,13 @@ router.post('/assistant', authMiddleware, aiRateLimit, async (req, res) => {
       temperature: 0.7,
     });
     const reply = completion.choices[0]?.message?.content || 'No response';
+    logAiUsage(req, parsed.data.query, reply, false);
     return sendSuccess(res, { reply, mock: false });
   } catch (e: any) {
     console.warn('[ai] OpenAI failed', e.message);
     // Fallback mock
     const mockReply = `أهلاً بك! في ${governorate}، مشكلتك "${parsed.data.query}" قد تكلف تقريباً 300-600 ج.م. (AI fallback)`;
+    logAiUsage(req, parsed.data.query, mockReply, true, e.message);
     return sendSuccess(res, { reply: mockReply, mock: true, error: e.message });
   }
 });

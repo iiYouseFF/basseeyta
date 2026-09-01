@@ -30,6 +30,8 @@ export const store = {
   admins: new Map<string, any>(), // id -> admin
   adminsByEmail: new Map<string, string>(), // email lower -> id
   adminAuditLogs: [] as any[], // ordered list
+  aiUsage: [] as any[], // AI assistant call log (id, userId, governorate, query, reply, mock, createdAt)
+  jobRuns: {} as Record<string, any>, // job name -> { lastRunAt, lastStatus, runs, lastDetail }
 };
 
 export function genId(): string {

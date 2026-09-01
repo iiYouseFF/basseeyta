@@ -4,10 +4,10 @@ import { createApp } from '../../src/app';
 describe('Docs', () => {
   const app = createApp();
 
-  it('GET /api-docs.json returns 88 endpoints', async () => {
+  it('GET /api-docs.json returns endpoints', async () => {
     const res = await request(app).get('/api-docs.json');
     expect(res.status).toBe(200);
-    expect(res.body.totalEndpoints).toBe(88);
+    expect(res.body.totalEndpoints).toBe(102);
     expect(res.body.groups.length).toBeGreaterThan(10);
     expect(res.body.version).toBe('1.0.0');
   });
@@ -16,7 +16,7 @@ describe('Docs', () => {
     const res = await request(app).get('/api');
     expect(res.status).toBe(200);
     expect(res.body.docs).toBe('/api-docs');
-    expect(res.body.totalEndpoints).toBe(88);
+    expect(res.body.totalEndpoints).toBe(102);
   });
 
   it('GET / returns HTML docs', async () => {

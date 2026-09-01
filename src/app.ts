@@ -128,8 +128,8 @@ export function createApp() {
       return res.status(401).json({ success: false, message: 'Unauthorized cron' });
     }
     const name = req.params.name;
-    const allowed = ['dailyReset', 'expireOffers', 'invoiceReminder', 'searchIndexGC', 'cleanupDrafts'];
-    if (!allowed.includes(name)) {
+    const { isJob, executeJob, recordJobRun } = require('./jobs/runner');
+    if (!isJob(name)) {
       return res.status(400).json({ success: false, message: `Unknown job ${name}` });
     }
     // Try BullMQ queue
@@ -138,33 +138,16 @@ export function createApp() {
       const queue = getCronQueue();
       if (queue) {
         await queue.add(name, {}, { delay: 0 });
+        recordJobRun(name, 'queued');
         return res.json({ success: true, data: { queued: name } });
       }
     } catch {}
     // Fallback in-memory execution
     try {
-      const { store, nowIso, genId } = require('./utils/store');
-      if (name === 'dailyReset') {
-        for (const tech of store.technicians.values()) {
-          tech.todayEarnings = 0;
-          tech.todayOrdersCount = 0;
-          tech.updatedAt = nowIso();
-          store.technicians.set(tech.phone, tech);
-        }
-      } else if (name === 'expireOffers') {
-        const cutoff = Date.now() - 48 * 60 * 60 * 1000;
-        for (const [id, offer] of store.offers.entries()) {
-          if (offer.status === 'pending' && new Date(offer.createdAt).getTime() < cutoff) {
-            offer.status = 'expired';
-            offer.updatedAt = nowIso();
-            store.offers.set(id, offer);
-          }
-        }
-      } else if (name === 'invoiceReminder') {
-        // handled via worker logic
-      }
-      return res.json({ success: true, data: { queued: name, executed: 'in-memory' } });
+      const result = await executeJob(name);
+      return res.json({ success: true, data: result });
     } catch (e: any) {
+      recordJobRun(name, 'error', { message: e.message });
       return res.status(500).json({ success: false, message: e.message });
     }
   });

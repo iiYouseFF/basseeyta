@@ -12,6 +12,54 @@ const ALLOWED_BUCKETS = ['profiles', 'account_verification', 'request', 'task_im
 // In-memory fallback storage: bucket/path -> Buffer + mimetype
 const memoryStorage = new Map<string, { buffer: Buffer; mimetype: string; originalName: string }>();
 
+// ---- Helpers reused by admin Storage Browser ----
+export async function listStorageFiles(bucket: string): Promise<any[]> {
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.storage.from(bucket).list('', { limit: 500 });
+      if (!error && data) {
+        return data.map((f: any) => ({
+          name: f.name,
+          id: f.id || null,
+          size: f.metadata?.size ?? null,
+          mimetype: f.metadata?.mimetype || null,
+          updatedAt: f.updated_at || null,
+        }));
+      }
+    } catch (e: any) {
+      console.warn('[storage] supabase list failed', e.message);
+    }
+  }
+  const prefix = `${bucket}/`;
+  const out: any[] = [];
+  for (const [key, rec] of memoryStorage.entries()) {
+    if (key.startsWith(prefix)) {
+      out.push({ name: key.slice(prefix.length), size: rec.buffer.length, mimetype: rec.mimetype, updatedAt: null });
+    }
+  }
+  return out.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+}
+
+export async function removeStorageFile(bucket: string, path: string): Promise<boolean> {
+  const fullKey = `${bucket}/${path}`;
+  const supabase = getSupabase();
+  if (supabase) {
+    try {
+      const { error } = await supabase.storage.from(bucket).remove([path]);
+      if (!error) return true;
+      console.warn('[storage] supabase remove failed', error.message);
+    } catch {}
+  }
+  if (memoryStorage.has(fullKey)) {
+    memoryStorage.delete(fullKey);
+    return true;
+  }
+  return false;
+}
+
+export { ALLOWED_BUCKETS };
+
 router.post('/upload', authMiddleware, upload.single('file'), async (req, res) => {
   const bucket = req.body.bucket as string;
   const documentId = req.body.documentId as string;

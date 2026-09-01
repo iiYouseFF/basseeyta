@@ -90,4 +90,83 @@ describe('Admin API', () => {
     expect(res.headers['content-type']).toMatch(/html/);
     expect(res.text).toContain('Basseeyta');
   });
+
+  it('Jobs — list all cron jobs with status', async () => {
+    const res = await request(app).get('/admin/api/jobs').set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body.data.length).toBeGreaterThanOrEqual(5);
+    const names = res.body.data.map((j: any) => j.name);
+    expect(names).toContain('dailyReset');
+    expect(res.body.data[0]).toHaveProperty('lastStatus');
+  });
+
+  it('Jobs — run in-memory job via admin endpoint', async () => {
+    const res = await request(app).post('/admin/api/jobs/dailyReset/run').set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveProperty('executed', 'dailyReset');
+    const list = await request(app).get('/admin/api/jobs').set('Authorization', `Bearer ${adminToken}`);
+    const job = list.body.data.find((j: any) => j.name === 'dailyReset');
+    expect(job.lastStatus).toBe('ok');
+    expect(job.runs).toBeGreaterThan(0);
+  });
+
+  it('Jobs — unknown job is rejected', async () => {
+    const res = await request(app).post('/admin/api/jobs/bogus/run').set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(400);
+  });
+
+  it('Storage Browser — list + invalid bucket', async () => {
+    const ok = await request(app).get('/admin/api/storage/profiles').set('Authorization', `Bearer ${adminToken}`);
+    expect(ok.status).toBe(200);
+    expect(Array.isArray(ok.body.data)).toBe(true);
+    expect(ok.body).toHaveProperty('bucket', 'profiles');
+    const bad = await request(app).get('/admin/api/storage/nope').set('Authorization', `Bearer ${adminToken}`);
+    expect(bad.status).toBe(400);
+  });
+
+  it('Push send — target all (broadcast)', async () => {
+    const res = await request(app)
+      .post('/admin/api/push/send')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ target: 'all', title: 'Test broadcast', body: 'hello wavelengths', type: 'admin_push' });
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveProperty('recipients');
+    expect(typeof res.body.data.recipients).toBe('number');
+    expect(res.body.data).toHaveProperty('fcm');
+  });
+
+  it('AI usage log — records assistant calls and exposes totals', async () => {
+    const reg = await request(app).post('/auth/register').send({ name: 'AiUser', phone: '01077770004', governorate: 'القاهرة' });
+    const token = reg.body.data.token;
+    await request(app).post('/ai/assistant').set('Authorization', `Bearer ${token}`).send({ query: 'كمبريسر مكيف لا يعمل؟' });
+    const res = await request(app).get('/admin/api/ai-usage').set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.length).toBeGreaterThan(0);
+    expect(res.body.data[0]).toHaveProperty('query');
+    expect(res.body.totals.total).toBeGreaterThan(0);
+  });
+
+  it('InstaPay — list enriches with commission fields + confirm closes the transfer', async () => {
+    const reg = await request(app).post('/auth/register').send({ name: 'PayUser', phone: '01077770005', governorate: 'القاهرة' });
+    const uid = reg.body.data.user.id;
+    const token = reg.body.data.token;
+    const created = await request(app)
+      .post('/payments/instapay')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ userId: uid, amount: 7500, requestId: '' });
+    expect(created.status).toBe(201);
+    const id = created.body.data.id;
+
+    const list = await request(app).get('/admin/api/instapay').set('Authorization', `Bearer ${adminToken}`);
+    const row = list.body.data.find((r: any) => r.id === id);
+    expect(row).toBeDefined();
+    expect(row).toHaveProperty('expectedCommission');
+    expect(row).toHaveProperty('orderTotal');
+    expect(row).toHaveProperty('mismatch');
+
+    const confirm = await request(app).post(`/admin/api/instapay/${id}/confirm`).set('Authorization', `Bearer ${adminToken}`);
+    expect(confirm.status).toBe(200);
+    expect(confirm.body.data.status).toBe('verified');
+  });
 });

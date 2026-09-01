@@ -79,6 +79,7 @@ export async function fetchEntities(entity: string, params: any) {
     notifications: '/admin/api/notifications',
     rooms: '/admin/api/chat-rooms',
     families: '/admin/api/families',
+    search: '/admin/api/search-index',
     audit: '/admin/api/audit-logs',
   };
   const path = map[entity] || `/admin/api/${entity}`;

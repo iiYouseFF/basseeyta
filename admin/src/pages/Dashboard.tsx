@@ -57,10 +57,14 @@ export default function Dashboard() {
         <Stat label="Technicians" value={stats.technicians} icon="⬣" color="slate" />
         <Stat label="Requests" value={stats.serviceRequests} sub={Object.entries(stats.requestsByStatus || {}).slice(0, 3).map(([k, v]) => `${k}:${v}`).join(' • ')} icon="⧉" color="amber" />
         <Stat label="Offers" value={stats.offers} icon="₿" color="slate" />
+        <Stat label="Reviews" value={stats.reviews ?? 0} icon="★" color="slate" />
         <Stat label="Revenue (completed)" value={`${stats.totalEarnings || 0} EGP`} sub={`${stats.paymentLogs} payment logs`} icon="₹" color="green" />
+        <Stat label="Revenue today" value={`${stats.revenueToday || 0} EGP`} sub={`${stats.revenueMonth || 0} EGP this month`} icon="↗" color="green" />
+        <Stat label="Active requests today" value={stats.todayActiveRequests ?? 0} sub={`${stats.todayRequests} total today`} icon="⚡" color="amber" />
         <Stat label="Posts" value={stats.posts} icon="▭" color="slate" />
         <Stat label="Open Tickets" value={stats.supportOpen} icon="☎" color="rose" />
         <Stat label="Pending KYC" value={stats.verificationsPending} icon="✓" color="amber" />
+        <Stat label="AI calls today" value={stats.aiUsageToday ?? 0} sub={`${stats.aiUsageMonth ?? 0} this month`} icon="≋" color="blue" />
       </div>
 
       <div className="grid grid-2">
@@ -101,14 +105,26 @@ export default function Dashboard() {
               <Link to="/admin/verifications" className="btn btn-primary">
                 Approve KYC →
               </Link>
-              <Link to="/admin/tickets" className="btn btn-secondary">
-                Support Queue
+              <Link to="/admin/instapay" className="btn btn-secondary">
+                InstaPay Queue
               </Link>
               <Link to="/admin/requests" className="btn btn-ghost">
                 Moderate Requests
               </Link>
               <Link to="/admin/promos" className="btn btn-ghost">
                 Promo Codes
+              </Link>
+              <Link to="/admin/jobs" className="btn btn-ghost">
+                Run Jobs
+              </Link>
+              <Link to="/admin/storage" className="btn btn-ghost">
+                Storage
+              </Link>
+              <Link to="/admin/ai" className="btn btn-ghost">
+                AI Usage
+              </Link>
+              <Link to="/admin/push" className="btn btn-ghost">
+                Push Campaign
               </Link>
             </div>
             <div style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>

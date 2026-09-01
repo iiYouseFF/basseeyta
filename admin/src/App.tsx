@@ -8,6 +8,12 @@ import GenericList from './pages/GenericList';
 import Verifications from './pages/Verifications';
 import Audit from './pages/Audit';
 import Admins from './pages/Admins';
+import Jobs from './pages/Jobs';
+import Storage from './pages/Storage';
+import AiUsage from './pages/AiUsage';
+import Push from './pages/Push';
+import InstaPay from './pages/InstaPay';
+import SearchIndex from './pages/SearchIndex';
 
 function Protected({ children, title, subtitle }: { children: React.ReactNode; title?: string; subtitle?: string }) {
   const { token, loading } = useAuth();
@@ -31,7 +37,7 @@ function AppRoutes() {
       <Route path="/admin/chat" element={<Protected title="Chat Rooms"><GenericList entityKey="rooms" /></Protected>} />
       <Route path="/admin/payments" element={<Protected title="Payment Logs"><GenericList entityKey="payments" /></Protected>} />
       <Route path="/admin/transactions" element={<Protected title="Transactions"><GenericList entityKey="transactions" /></Protected>} />
-      <Route path="/admin/instapay" element={<Protected title="InstaPay"><GenericList entityKey="instapay" /></Protected>} />
+      <Route path="/admin/instapay" element={<Protected title="InstaPay Console" subtitle="Commission verification queue"><InstaPay /></Protected>} />
       <Route path="/admin/promos" element={<Protected title="Promo Codes"><GenericList entityKey="promos" /></Protected>} />
       <Route path="/admin/posts" element={<Protected title="Posts"><GenericList entityKey="posts" /></Protected>} />
       <Route path="/admin/reviews" element={<Protected title="Reviews"><GenericList entityKey="reviews" /></Protected>} />
@@ -39,9 +45,13 @@ function AppRoutes() {
       <Route path="/admin/notifications" element={<Protected title="Notifications"><GenericList entityKey="notifications" /></Protected>} />
       <Route path="/admin/verifications" element={<Protected title="Verifications"><Verifications /></Protected>} />
       <Route path="/admin/families" element={<Protected title="Families"><GenericList entityKey="families" /></Protected>} />
-      <Route path="/admin/search" element={<Protected title="Search Index"><GenericList entityKey="search" /></Protected>} />
+      <Route path="/admin/search" element={<Protected title="Search Index" subtitle="Browse, moderate & re-index"><SearchIndex /></Protected>} />
       <Route path="/admin/audit" element={<Protected title="Audit Log" subtitle="Full history of admin actions"><Audit /></Protected>} />
       <Route path="/admin/admins" element={<Protected title="Admins" subtitle="Manage admin accounts"><Admins /></Protected>} />
+      <Route path="/admin/jobs" element={<Protected title="Jobs / Cron Monitor" subtitle="Scheduled maintenance jobs"><Jobs /></Protected>} />
+      <Route path="/admin/storage" element={<Protected title="Storage Browser" subtitle="Browse & moderate uploaded files"><Storage /></Protected>} />
+      <Route path="/admin/ai" element={<Protected title="AI Usage Log" subtitle="Assistant calls & fallback rates"><AiUsage /></Protected>} />
+      <Route path="/admin/push" element={<Protected title="Push Notifications" subtitle="Compose & broadcast"><Push /></Protected>} />
       {/* Legacy aliases */}
       <Route path="/admin/verifications/*" element={<Navigate to="/admin/verifications" replace />} />
       <Route path="*" element={<Navigate to="/admin" replace />} />
