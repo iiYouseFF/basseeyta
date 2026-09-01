@@ -32,6 +32,7 @@ import appointmentsRoutes from './modules/appointments/appointments.routes';
 import familyRoutes from './modules/family/family.routes';
 import verificationRoutes from './modules/verification/verification.routes';
 import aiRoutes from './modules/ai/ai.routes';
+import n8nRoutes from './modules/n8n/n8n.routes';
 import docsRoutes from './modules/docs/docs.routes';
 
 export function createApp() {
@@ -100,6 +101,8 @@ export function createApp() {
   app.use('/appointments', appointmentsRoutes);
   app.use('/verification', verificationRoutes);
   app.use('/ai', aiRoutes);
+  // n8n webhook proxy (technician report + customer chat)
+  app.use('/api', n8nRoutes);
 
   // Jobs cron endpoint – secure
   app.post('/jobs/:name', async (req, res) => {
