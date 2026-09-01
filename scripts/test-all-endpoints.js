@@ -2,7 +2,7 @@
 /**
  * Smoke test all ~81 endpoints – runs against in-memory app (no DB needed)
  * Usage: node scripts/test-all-endpoints.js  (or npm run smoke)
- * Also works against live VPS: API_BASE=https://basseeyta.duckdns.org node scripts/test-all-endpoints.js
+ * Also works against live VPS: API_BASE=http://basseeyta.duckdns.org/ node scripts/test-all-endpoints.js
  */
 
 const base = process.env.API_BASE || '';
