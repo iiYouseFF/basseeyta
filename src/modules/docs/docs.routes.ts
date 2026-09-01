@@ -211,19 +211,19 @@ details{margin:8px 0}summary{cursor:pointer;color:#cbd5e1}
     <code>Authorization: Bearer &lt;jwt&gt;</code> after <code>POST /auth/verify-otp</code> · 
     <a href="/api-docs.json">JSON</a> · <a href="/health">health</a></p>
   </div>
-  <div class="badges"><span>Mock OTP: ${process.env.USE_MOCK_OTP==='true'?'ON':'OFF'}</span><span>92 smoke tests</span><span>PM2 cluster</span></div>
+  <div class="badges"><span>Mock OTP: ${process.env.USE_MOCK_OTP==='true'?'ON':'OFF'}</span><span>92 smoke tests</span><span>PM2 cluster</span><a href="/socket-test.html" style="display:inline-block;padding:6px 12px;border-radius:999px;background:#4f46e5;color:white;text-decoration:none;font-size:13px;font-weight:700;margin-left:8px">🧪 Socket Chat Tester</a></div>
 </header>
 <div class="wrap">
   <div class="card">
     <h2>Quick start</h2>
-    <p>Base URL: <code>https://basseeyta.duckdns.org</code> (prod) or <code>http://localhost:3000</code> (dev)</p>
-    <pre class="kbd">curl https://basseeyta.duckdns.org/health
-curl -X POST https://basseeyta.duckdns.org/auth/request-otp -H 'Content-Type: application/json' -d '{"phone":"+201012345678"}'
+    <p>Base URL: <code>http://basseeyta.duckdns.org/</code> (prod) or <code>http://localhost:3000</code> (dev)</p>
+    <pre class="kbd">curl http://basseeyta.duckdns.org/health
+curl -X POST http://basseeyta.duckdns.org/auth/request-otp -H 'Content-Type: application/json' -d '{"phone":"+201012345678"}'
 # mock returns {mock:true, verificationId}
-curl -X POST https://basseeyta.duckdns.org/auth/verify-otp -d '{"phone":"+201012345678","code":"123456","verificationId":"..."}' # → {token}
-curl -H "Authorization: Bearer &lt;token&gt;" https://basseeyta.duckdns.org/users/me</pre>
-    <p>Flutter: <code>flutter run --dart-define=API_BASE_URL=https://basseeyta.duckdns.org --dart-define=USE_MOCK_OTP=true</code></p>
-    <p>Smoke (92 checks): <code>npm run smoke</code> or <code>API_BASE=https://basseeyta.duckdns.org npm run smoke:live</code></p>
+curl -X POST http://basseeyta.duckdns.org/auth/verify-otp -d '{"phone":"+201012345678","code":"123456","verificationId":"..."}' # → {token}
+curl -H "Authorization: Bearer &lt;token&gt;" http://basseeyta.duckdns.org/users/me</pre>
+    <p>Flutter: <code>flutter run --dart-define=API_BASE_URL=http://basseeyta.duckdns.org/ --dart-define=USE_MOCK_OTP=true</code></p>
+    <p>Smoke (92 checks): <code>npm run smoke</code> or <code>API_BASE=http://basseeyta.duckdns.org/ npm run smoke:live</code></p>
   </div>
   <div class="card">
     <h2>Auth flow</h2>
@@ -250,10 +250,11 @@ curl -H "Authorization: Bearer &lt;token&gt;" https://basseeyta.duckdns.org/user
   <div class="card">
     <h2>Socket.io</h2>
     <p>Namespaces: <code>/chat</code>, <code>/notifications</code>, <code>/requests</code> – auth via <code>handshake.auth.token</code> (JWT)</p>
-    <pre class="kbd">socket = io('https://basseeyta.duckdns.org/chat', {auth:{token}})
+    <pre class="kbd">socket = io('http://basseeyta.duckdns.org/chat', {auth:{token}})
 socket.emit('join_room', roomId); socket.on('new_message', cb)
 io('/notifications').emit('subscribe', userId) // also user:{id}
 io('/requests').emit('subscribe_governorate', 'القاهرة')</pre>
+    <p style="margin-top:10px"><a href="/socket-test.html" style="display:inline-block;padding:8px 14px;background:#4f46e5;color:white;border-radius:8px;text-decoration:none;font-weight:700">Open Interactive Tester → /socket-test.html</a> <span style="color:var(--muted);font-size:13px">Live auth + REST + Socket in one page, plus Postman guide</span></p>
   </div>
   <div class="card">
     <h2>Buckets & Jobs</h2>
@@ -274,7 +275,7 @@ router.get('/api-docs.json', (_req, res) => {
   res.json({
     name: 'Basita (بسيطة) API',
     version: '1.0.0',
-    baseUrl: 'https://basseeyta.duckdns.org',
+    baseUrl: 'http://basseeyta.duckdns.org/',
     health: '/health',
     auth: 'Bearer JWT from POST /auth/verify-otp',
     totalEndpoints: total,

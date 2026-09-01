@@ -3,6 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { globalRateLimit } from './middleware/rateLimit';
 import { requestIdMiddleware } from './middleware/requestId';
@@ -30,14 +32,18 @@ import appointmentsRoutes from './modules/appointments/appointments.routes';
 import familyRoutes from './modules/family/family.routes';
 import verificationRoutes from './modules/verification/verification.routes';
 import aiRoutes from './modules/ai/ai.routes';
+import n8nRoutes from './modules/n8n/n8n.routes';
 import docsRoutes from './modules/docs/docs.routes';
 
 export function createApp() {
   const app = express();
 
-  // Security & middleware
-  app.use(helmet());
+  // Security & middleware — CSP disabled to allow CDN socket.io on /socket-test
+  app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
   app.use(cors({ origin: '*', credentials: true }));
+  // Serve public folder (socket-test.html etc)
+  const publicDir = path.join(process.cwd(), 'public');
+  if (fs.existsSync(publicDir)) app.use(express.static(publicDir));
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true }));
   app.use(requestIdMiddleware);
@@ -59,6 +65,13 @@ export function createApp() {
   // Also support /api/health for compat
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', version: '1.0.0', timestamp: new Date().toISOString() });
+  });
+
+  // Socket.IO test page — also served statically as /socket-test.html, alias here for convenience
+  app.get('/socket-test', (_req, res) => {
+    const filePath = path.join(process.cwd(), 'public', 'socket-test.html');
+    if (fs.existsSync(filePath)) return res.sendFile(filePath);
+    return res.status(404).json({ success: false, message: 'socket-test.html not found — build public folder' });
   });
 
   // API docs – must be before 404
@@ -88,6 +101,8 @@ export function createApp() {
   app.use('/appointments', appointmentsRoutes);
   app.use('/verification', verificationRoutes);
   app.use('/ai', aiRoutes);
+  // n8n webhook proxy (technician report + customer chat)
+  app.use('/api', n8nRoutes);
 
   // Jobs cron endpoint – secure
   app.post('/jobs/:name', async (req, res) => {

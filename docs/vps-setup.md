@@ -43,8 +43,8 @@ sudo ln -s /etc/nginx/sites-available/basita /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl restart nginx
 
-# HTTPS
-sudo certbot --nginx -d api.basita.example.com
+# HTTPS (optional – currently API is at http://basseeyta.duckdns.org/ )
+# For TLS: sudo certbot --nginx -d basseeyta.duckdns.org
 
 # Redis systemd
 sudo systemctl enable redis-server
@@ -52,7 +52,7 @@ sudo systemctl start redis-server
 
 # Verify deploy
 curl http://localhost:3000/health
-curl https://api.basita.example.com/health
+curl http://basseeyta.duckdns.org/health
 pm2 logs basita-api
 ```
 

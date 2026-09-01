@@ -29,6 +29,12 @@ export const env = {
   FAWRY_MERCHANT_CODE: process.env.FAWRY_MERCHANT_CODE || '',
   FAWRY_SECURITY_KEY: process.env.FAWRY_SECURITY_KEY || '',
   OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+  // n8n webhook proxy
+  N8N_BASE_URL: process.env.N8N_BASE_URL || 'https://basseeyta-api.duckdns.org',
+  N8N_TECHNICIAN_WEBHOOK: process.env.N8N_TECHNICIAN_WEBHOOK || '/webhook/technician-report',
+  N8N_CHAT_WEBHOOK: process.env.N8N_CHAT_WEBHOOK || '/webhook/chat',
+  N8N_TIMEOUT_MS: parseInt(process.env.N8N_TIMEOUT_MS || '60000', 10),
+
   REDIS_URL: process.env.REDIS_URL || 'redis://localhost:6379',
   CRON_SECRET: process.env.CRON_SECRET || 'dev_cron_secret',
   // Mock OTP: default true in dev/test, explicit false only in production with real Firebase. Prevents CI failures when .env is missing.
