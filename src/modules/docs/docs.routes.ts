@@ -181,6 +181,25 @@ const endpoints = [
       { method: 'POST', path: '/jobs/:name', auth: true, description: 'Bearer CRON_SECRET, queued or in-memory. Allowed: dailyReset, expireOffers, invoiceReminder, searchIndexGC, cleanupDrafts', body: '', query: '' },
     ],
   },
+  {
+    group: 'Admin (15)',
+    endpoints: [
+      { method: 'POST', path: '/admin/api/auth/login', auth: false, description: 'Superadmin login — email admin@basseeyta.com + password', body: '{email, password} → {token, admin}', query: '' },
+      { method: 'GET', path: '/admin/api/auth/me', auth: true, description: 'Current admin (requires admin JWT)', body: '', query: '' },
+      { method: 'GET', path: '/admin/api/stats', auth: true, description: 'Dashboard aggregates — users, techs, requests by status, revenue', body: '', query: '' },
+      { method: 'GET', path: '/admin/api/audit-logs', auth: true, description: 'Audit history — every admin create/update/delete/approve', query: '?page&limit&table&action&adminEmail', body: '' },
+      { method: 'GET', path: '/admin/api/users', auth: true, description: 'List users — search/governorate, paginated', query: '?search&governorate&page&limit', body: '' },
+      { method: 'PATCH', path: '/admin/api/users/:id', auth: true, description: 'Whitelisted: name,email,governorate,city,region,placeType', body: '{name?,email?,governorate?}', query: '' },
+      { method: 'GET', path: '/admin/api/technicians', auth: true, description: 'List techs — search/governorate/specialty', query: '?search&governorate&specialty', body: '' },
+      { method: 'PATCH', path: '/admin/api/technicians/:phone', auth: true, description: 'Whitelisted: fullName,specialty,is_verified,walletBalance', body: '', query: '' },
+      { method: 'GET', path: '/admin/api/service-requests', auth: true, description: 'List requests — status/governorate/serviceType/search', query: '?status&governorate&serviceType&search', body: '' },
+      { method: 'GET', path: '/admin/api/verifications', auth: true, description: 'KYC queue — pending/approved/rejected', query: '?status&search', body: '' },
+      { method: 'PATCH', path: '/admin/api/verifications/:userId', auth: true, description: 'Approve/reject — audited', body: '{status: pending|approved|rejected}', query: '' },
+      { method: 'GET', path: '/admin/api/promo-codes', auth: true, description: 'List promos', query: '', body: '' },
+      { method: 'POST', path: '/admin/api/promo-codes', auth: true, description: 'Create promo', body: '{code, discount_type, discount_value, max_uses}', query: '' },
+      { method: 'GET', path: '/admin', auth: false, description: 'Admin SPA — React+Vite dashboard (Cairo, #0056D2) — same domain', body: '', query: '' },
+    ],
+  },
 ];
 
 const html = `<!DOCTYPE html>
@@ -211,7 +230,7 @@ details{margin:8px 0}summary{cursor:pointer;color:#cbd5e1}
     <code>Authorization: Bearer &lt;jwt&gt;</code> after <code>POST /auth/verify-otp</code> · 
     <a href="/api-docs.json">JSON</a> · <a href="/health">health</a></p>
   </div>
-  <div class="badges"><span>Mock OTP: ${process.env.USE_MOCK_OTP==='true'?'ON':'OFF'}</span><span>92 smoke tests</span><span>PM2 cluster</span><a href="/socket-test.html" style="display:inline-block;padding:6px 12px;border-radius:999px;background:#4f46e5;color:white;text-decoration:none;font-size:13px;font-weight:700;margin-left:8px">🧪 Socket Chat Tester</a></div>
+  <div class="badges"><span>Mock OTP: ${process.env.USE_MOCK_OTP==='true'?'ON':'OFF'}</span><span>92 smoke tests</span><span>PM2 cluster</span><a href="/admin" style="display:inline-block;padding:6px 12px;border-radius:999px;background:#0056D2;color:white;text-decoration:none;font-size:13px;font-weight:700;margin-left:8px">🛡️ Admin Dashboard</a><a href="/socket-test.html" style="display:inline-block;padding:6px 12px;border-radius:999px;background:#4f46e5;color:white;text-decoration:none;font-size:13px;font-weight:700;margin-left:6px">🧪 Socket Tester</a></div>
 </header>
 <div class="wrap">
   <div class="card">

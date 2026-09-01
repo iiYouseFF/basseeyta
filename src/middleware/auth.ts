@@ -23,6 +23,8 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
       phone: payload.phone,
       userType: payload.userType,
       jti: payload.jti,
+      email: (payload as any).email,
+      isAdmin: payload.userType === 'admin' || !!(payload as any).isAdmin,
     };
     next();
   } catch (e: any) {
@@ -39,8 +41,22 @@ export function optionalAuth(req: Request, _res: Response, next: NextFunction) {
     const token = authHeader.slice(7);
     try {
       const payload = verifyJwt(token);
-      req.user = { id: payload.sub, phone: payload.phone, userType: payload.userType, jti: payload.jti };
+      req.user = {
+        id: payload.sub,
+        phone: payload.phone,
+        userType: payload.userType,
+        jti: payload.jti,
+        email: (payload as any).email,
+        isAdmin: payload.userType === 'admin' || !!(payload as any).isAdmin,
+      };
     } catch {}
   }
+  next();
+}
+
+export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.user) return sendError(res, 401, 'Not authenticated');
+  const isAdmin = req.user.userType === 'admin' || !!req.user.isAdmin;
+  if (!isAdmin) return sendError(res, 403, 'Admin access required');
   next();
 }

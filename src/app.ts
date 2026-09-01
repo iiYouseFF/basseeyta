@@ -34,6 +34,7 @@ import verificationRoutes from './modules/verification/verification.routes';
 import aiRoutes from './modules/ai/ai.routes';
 import n8nRoutes from './modules/n8n/n8n.routes';
 import docsRoutes from './modules/docs/docs.routes';
+import adminRoutes from './modules/admin/admin.routes';
 
 export function createApp() {
   const app = express();
@@ -103,6 +104,22 @@ export function createApp() {
   app.use('/ai', aiRoutes);
   // n8n webhook proxy (technician report + customer chat)
   app.use('/api', n8nRoutes);
+
+  // Admin API — namespaced under /admin/api to avoid clash with SPA routes at /admin/*
+  app.use('/admin/api', adminRoutes); // includes /admin/api/auth/login (public) + protected /admin/api/*
+
+  // Admin SPA — serve Vite build at /admin (same domain)
+  // Must be after API mount so /admin/api/* is handled by API, not static
+  const adminDist = path.join(publicDir, 'admin');
+  if (fs.existsSync(path.join(adminDist, 'index.html'))) {
+    app.use('/admin', express.static(adminDist));
+    // SPA fallback for client-side routing (must be after /admin/api mount but before 404)
+    // Exclude /admin/api/* from fallback
+    app.get('/admin/*', (req, res, next) => {
+      if (req.path.startsWith('/admin/api/')) return next();
+      res.sendFile(path.join(adminDist, 'index.html'));
+    });
+  }
 
   // Jobs cron endpoint – secure
   app.post('/jobs/:name', async (req, res) => {

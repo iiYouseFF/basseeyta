@@ -126,14 +126,39 @@ export interface Notification {
   createdAt: string;
 }
 
+export interface Admin {
+  id: string;
+  email: string;
+  name: string;
+  isSuperadmin: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminAuditLog {
+  id: string;
+  adminId: string;
+  adminEmail: string;
+  action: 'login' | 'create' | 'update' | 'delete' | 'approve' | 'reject' | 'bulk' | 'view';
+  tableName?: string;
+  recordId?: string;
+  diff?: Record<string, any>;
+  ipAddress?: string;
+  userAgent?: string;
+  createdAt: string;
+}
+
 declare global {
   namespace Express {
     interface Request {
       user?: {
         id: string;
         phone: string;
-        userType: 'user' | 'technician';
+        userType: 'user' | 'technician' | 'admin';
         jti: string;
+        email?: string;
+        isAdmin?: boolean;
       };
       requestId?: string;
     }

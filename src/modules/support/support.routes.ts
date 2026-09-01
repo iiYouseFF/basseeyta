@@ -60,6 +60,10 @@ router.patch('/:id', authMiddleware, async (req, res) => {
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return sendError(res, 400, 'Invalid update', parsed.error.errors);
+  // Admin-only fields: adminReply and status transitions beyond open require admin
+  const needsAdmin = parsed.data.adminReply !== undefined || (parsed.data.status && parsed.data.status !== 'open');
+  const user = (req as any).user;
+  if (needsAdmin && user?.userType !== 'admin' && !user?.isAdmin) return sendError(res, 403, 'Admin access required to update status/adminReply');
   const updated = { ...ticket, ...parsed.data, updatedAt: nowIso(), updated_at: nowIso() };
   store.supportTickets.set(req.params.id, updated);
   return sendSuccess(res, updated);

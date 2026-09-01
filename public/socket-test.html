@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Basita – Socket.IO Chat Tester</title>
+<title>Basita – Socket.IO + Postman E2E Tester</title>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <style>
-:root{--bg:#0b0e14;--card:#151a27;--muted:#9aa3b2;--accent:#4f46e5;--border:#222839;--ok:#10b981;--warn:#f59e0b;--err:#ef4444}
+:root{--bg:#0b0e14;--card:#151a27;--muted:#9aa3b2;--accent:#4f46e5;--accent2:#06b6d4;--border:#222839;--ok:#10b981;--warn:#f59e0b;--err:#ef4444}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:#e6e8ee;line-height:1.5}
 a{color:#8ea6ff}
 header{position:sticky;top:0;z-index:10;backdrop-filter:blur(8px);background:rgba(11,14,20,.92);border-bottom:1px solid var(--border);padding:16px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
@@ -23,6 +23,7 @@ textarea{resize:vertical;min-height:64px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 button{padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:var(--accent);color:white;font-weight:600;cursor:pointer;font-size:13px}
 button.sec{background:#1e293b;border-color:#334155}button.ghost{background:transparent;color:#cbd5e1}
+button.teal{background:#0e7490;border-color:#155e75}button.okBtn{background:var(--ok);border-color:#059669;color:#022c22}
 button:disabled{opacity:.5;cursor:not-allowed}
 .badge{display:inline-block;padding:3px 8px;border-radius:999px;font-size:11px;border:1px solid var(--border)}
 .badge.ok{background:rgba(16,185,129,.15);color:var(--ok);border-color:rgba(16,185,129,.3)}
@@ -39,6 +40,24 @@ kbd{background:rgba(255,255,255,.06);padding:2px 6px;border-radius:6px;font-size
 .table th,.table td{padding:6px 8px;border-bottom:1px solid var(--border);text-align:left}
 .steps{counter-reset:step} .steps li{margin:8px 0}
 .pill{font-size:11px;padding:4px 8px;border-radius:999px;background:#1e293b;border:1px solid var(--border)}
+.flow-stepper{display:flex;gap:6px;align-items:center;margin:10px 0;flex-wrap:wrap}
+.flow-step{display:flex;align-items:center;gap:6px;background:#0b0e14;border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:12px}
+.flow-step.active{border-color:var(--ok);background:rgba(16,185,129,.12);color:var(--ok)}
+.flow-step.done{border-color:var(--accent);background:rgba(79,70,229,.12)}
+.flow-step .num{width:22px;height:22px;border-radius:50%;background:#1e293b;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px}
+.flow-step.active .num{background:var(--ok);color:#022c22}
+.flow-step.done .num{background:var(--accent);color:white}
+.vars{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px}
+.var{ background:#0b0e14;border:1px solid var(--border);border-radius:8px;padding:6px 8px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+.var b{color:var(--muted);font-weight:500} .var code{color:#e6e8ee;word-break:break-all}
+.progress{height:6px;background:#0b0e14;border:1px solid var(--border);border-radius:999px;overflow:hidden;margin:8px 0}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--ok));width:0%;transition:width .4s}
+details{border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:#0b0e14;margin:8px 0}
+details summary{cursor:pointer;font-weight:600;font-size:13px}
+pre.code{background:#0b0e14;border:1px solid var(--border);padding:10px;border-radius:8px;overflow:auto;font-size:12px;white-space:pre-wrap;word-break:break-all}
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--border);margin:10px 0;padding-bottom:8px}
+.tabs button{padding:6px 12px;font-size:12px}
+.tabs button.active{background:var(--accent);border-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -62,7 +81,7 @@ kbd{background:rgba(255,255,255,.06);padding:2px 6px;border-radius:6px;font-size
         <label>API Base URL (REST + Socket.IO origin)</label>
         <input id="baseUrl" value="http://basseeyta.duckdns.org" placeholder="http://basseeyta.duckdns.org" />
         <div style="font-size:11px;color:var(--muted);margin-top:4px">Prod: <code>http://basseeyta.duckdns.org</code> — Dev: <code>http://localhost:3000</code>. Must be <code>http://</code> (no <code>https</code>) for this VPS.</div>
-        <label>JWT Token — from <code>POST /auth/verify-otp</code> or <code>/auth/register</code></label>
+        <label>JWT Token — from <code>POST /auth/verify-otp</code> or <code>/auth/register</code> (active / primary)</label>
         <textarea id="token" rows="3" placeholder="eyJhbGci... paste JWT here (optional for dev, required for auth-guarded REST)"></textarea>
         <div class="row" style="margin-top:8px">
           <button onclick="saveConfig()">Save Config</button>
@@ -80,7 +99,7 @@ kbd{background:rgba(255,255,255,.06);padding:2px 6px;border-radius:6px;font-size
           <div style="flex:1"><label>Technician ID (phone)</label><input id="techId" placeholder="+2010... or phone" /></div>
         </div>
         <div class="row">
-          <div style="flex:1"><label>Request ID</label><input id="requestId" placeholder="service_request id" /></div>
+          <div style="flex:1"><label>Request ID (order)</label><input id="requestId" placeholder="service_request id" /></div>
           <div style="flex:1"><label>Sender Type</label>
             <select id="senderType"><option value="user">user</option><option value="technician">technician</option></select>
           </div>
@@ -90,13 +109,269 @@ kbd{background:rgba(255,255,255,.06);padding:2px 6px;border-radius:6px;font-size
           <button class="sec" onclick="useIdsFromToken()">Decode Token → Fill IDs</button>
           <button class="ghost" onclick="generateDemoIds()">Generate Demo IDs</button>
         </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px">💡 For the <b>E2E order flow</b> below you don't need to fill this manually — the automated runner keeps its own <code>customerToken / techToken</code> and auto-fills these fields on success. These fields are the fallback for chat-only testing.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NEW: E2E Flow Automated -->
+  <div class="card" style="border-color:#10b981;box-shadow:0 0 0 1px rgba(16,185,129,.15)">
+    <h2 style="border-left-color:var(--ok)">2 — Postman E2E Flow : Create Account → Make Order → Accept (Automated + Manual)</h2>
+    <p style="font-size:13px;color:var(--muted);margin:6px 0 0">One page does what Postman does — but with a <b>single click</b>. It runs the exact same REST calls Postman would (register customer + technician, create <code>service-request</code>, technician creates <code>offer</code>, customer <code>accepts</code>). After finish it auto-joins the chat room and proves the <code>/appointments</code> was created. Or follow the numbered Postman manual below with exportable collection + curl.</p>
+
+    <div class="tabs" id="flowTabs">
+      <button class="active" onclick="switchFlowTab('run')">▶ Interactive Runner</button>
+      <button onclick="switchFlowTab('manual')">📖 Postman Manual (step-by-step)</button>
+      <button onclick="switchFlowTab('export')">📦 Export: Collection / Curl</button>
+    </div>
+
+    <!-- Tab: Runner -->
+    <div id="flowTab-run">
+      <div class="flow-stepper" id="flowStepper">
+        <div class="flow-step" id="flowS1"><span class="num">1</span> Register Cust</div>
+        <div class="flow-step" id="flowS2"><span class="num">2</span> Register Tech</div>
+        <div class="flow-step" id="flowS3"><span class="num">3</span> Create Order</div>
+        <div class="flow-step" id="flowS4"><span class="num">4</span> Tech Offer</div>
+        <div class="flow-step" id="flowS5"><span class="num">5</span> Accept Offer</div>
+        <div class="flow-step" id="flowS6"><span class="num">6</span> Verify</div>
+      </div>
+      <div class="progress"><i id="flowProgress"></i></div>
+
+      <div class="grid">
+        <div>
+          <h3>Run Controls</h3>
+          <div class="row">
+            <button class="okBtn" onclick="flowRunAll()">▶ Run Full Flow (1 → 6)</button>
+            <button class="sec" onclick="flowReset()">Reset Vars</button>
+            <span id="flowStatus" class="badge warn">idle</span>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-top:6px">Uses <code id="flowBasePreview">http://basseeyta.duckdns.org</code> + two separate tokens (cust / tech). Tokens are stored in <code>localStorage</code> and also synced to the top Config.</div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+            <div><label>Customer Name</label><input id="flowCustName" value="Postman Customer" /></div>
+            <div><label>Tech Name</label><input id="flowTechName" value="Postman Tech" /></div>
+            <div><label>Governorate</label><input id="flowGov" value="القاهرة" /></div>
+            <div><label>Service Type</label>
+              <select id="flowServiceType"><option value="plumbing" selected>plumbing</option><option value="electrical">electrical</option><option value="carpentry">carpentry</option><option value="painting">painting</option><option value="cleaning">cleaning</option></select>
+            </div>
+            <div><label>Customer Phone (auto-gen if empty)</label><input id="flowCustPhone" placeholder="0100... leave empty to auto-gen" /></div>
+            <div><label>Tech Phone (auto-gen if empty)</label><input id="flowTechPhone" placeholder="0100... leave empty to auto-gen" /></div>
+            <div><label>Budget</label><input id="flowBudget" value="500" /></div>
+            <div><label>Offer Price</label><input id="flowOfferPrice" value="450" /></div>
+            <div style="grid-column:1/-1"><label>Order Title</label><input id="flowTitle" value="سباكة - تسريب مياه بالمطبخ" /></div>
+            <div style="grid-column:1/-1"><label>Description</label><textarea id="flowDesc" rows="2">تسريب مياه تحت الحوض، محتاج فني سباكة بسرعة. العنوان: القاهرة.</textarea></div>
+          </div>
+
+          <div class="grid" style="margin-top:10px">
+            <button class="sec" onclick="flowStep1()">1. POST /auth/register (cust)</button>
+            <button class="sec" onclick="flowStep2()">2. POST /auth/technicians/register</button>
+            <button class="sec" onclick="flowStep3()">3. POST /service-requests</button>
+            <button class="sec" onclick="flowStep4()">4. POST /…/:id/offers</button>
+            <button class="teal" onclick="flowStep4b()">4b. GET …/:id/offers (list)</button>
+            <button class="okBtn" onclick="flowStep5()">5. PATCH /offers/:id (accept)</button>
+            <button class="sec" onclick="flowStep6()">6. Verify chat + appointment</button>
+            <button class="ghost" onclick="flowJoinSocketAfterAccept()">Join Socket Room</button>
+          </div>
+
+          <div style="margin-top:10px;background:#0e3a2a;border:1px solid rgba(52,211,153,.3);border-radius:8px;padding:8px 10px;font-size:12px">
+            <b style="color:#34d399">What Accept does (server):</b> <code>offer.status→accepted</code>, <code>service_request.status→accepted + technicianId</code>, rejects other offers, creates <code>chatRoom</code> + <code>appointment</code>, notifies tech via <code>/notifications</code>. (<code>src/modules/offers/offers.routes.ts:112</code>)
+          </div>
+        </div>
+
+        <div>
+          <h3>Flow Variables (auto-filled, copied to Postman env)</h3>
+          <div class="vars" id="flowVars">
+            <div class="var"><b>baseUrl</b><code id="vBase">-</code><button class="pill" onclick="copyText(document.getElementById('vBase').textContent)">Copy</button></div>
+            <div class="var"><b>customerId</b><code id="vCustId">-</code><button class="pill" onclick="copyText(document.getElementById('vCustId').textContent)">Copy</button></div>
+            <div class="var"><b>customerPhone</b><code id="vCustPhone">-</code><button class="pill" onclick="copyText(document.getElementById('vCustPhone').textContent)">Copy</button></div>
+            <div class="var" style="grid-column:1/-1"><b>customerToken</b><code id="vCustToken" style="font-size:10px">-</code><button class="pill" onclick="copyText(document.getElementById('vCustToken').textContent)">Copy</button></div>
+            <div class="var"><b>techId (phone)</b><code id="vTechId">-</code><button class="pill" onclick="copyText(document.getElementById('vTechId').textContent)">Copy</button></div>
+            <div class="var" style="grid-column:1/-1"><b>techToken</b><code id="vTechToken" style="font-size:10px">-</code><button class="pill" onclick="copyText(document.getElementById('vTechToken').textContent)">Copy</button></div>
+            <div class="var"><b>requestId</b><code id="vReqId">-</code><button class="pill" onclick="copyText(document.getElementById('vReqId').textContent)">Copy</button></div>
+            <div class="var"><b>offerId</b><code id="vOfferId">-</code><button class="pill" onclick="copyText(document.getElementById('vOfferId').textContent)">Copy</button></div>
+            <div class="var"><b>roomId</b><code id="vRoomId">-</code><button class="pill" onclick="copyText(document.getElementById('vRoomId').textContent)">Copy</button></div>
+            <div class="var"><b>appointmentId</b><code id="vApptId">-</code><button class="pill" onclick="copyText(document.getElementById('vApptId').textContent)">Copy</button></div>
+          </div>
+          <div style="margin-top:8px" class="row">
+            <button class="sec" onclick="syncVarsToTopConfig()">↗ Push IDs → Top Config + Socket</button>
+            <button class="ghost" onclick="copyFlowEnvTable()">Copy Env JSON</button>
+          </div>
+          <label>Runner Log</label>
+          <div id="flowLog" class="log" style="height:260px">Ready — click "Run Full Flow" or execute steps 1→6 individually. Each step logs status + server JSON slice.</div>
+          <label>Verification Preview (last verify)</label>
+          <div id="flowVerify" class="log" style="height:170px">Not verified yet…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Manual -->
+    <div id="flowTab-manual" style="display:none">
+      <div style="background:#0b0e14;border:1px solid var(--border);border-radius:10px;padding:12px;">
+        <h3 style="margin:0 0 6px">Postman Environment — create first</h3>
+        <p style="font-size:12px;color:var(--muted);margin:0 0 8px">In Postman: <b>Environments → New →</b> name it <code>Basseeyta E2E</code>, add these variables, then select it (top-right). All requests below use <code>{{var}}</code>.</p>
+        <table class="table" style="background:#151a27;border-radius:8px;overflow:hidden">
+          <tr><th>Variable</th><th>Initial Value (edit after run)</th><th>Where it comes from</th></tr>
+          <tr><td><code>base</code></td><td><code id="manBase">http://basseeyta.duckdns.org</code></td><td>your API origin (<code>/health</code> must return 200)</td></tr>
+          <tr><td><code>customerToken</code></td><td>—</td><td><code>POST /auth/register</code> → <code>data.token</code></td></tr>
+          <tr><td><code>techToken</code></td><td>—</td><td><code>POST /auth/technicians/register</code> → <code>data.token</code></td></tr>
+          <tr><td><code>customerId</code></td><td>—</td><td><code>data.user.id</code></td></tr>
+          <tr><td><code>customerPhone</code></td><td>—</td><td>normalized phone (<code>+20…</code>)</td></tr>
+          <tr><td><code>techPhone</code></td><td>—</td><td><code>data.technician.phone</code> ( = id )</td></tr>
+          <tr><td><code>requestId</code></td><td>—</td><td><code>POST /service-requests</code> → <code>data.id</code></td></tr>
+          <tr><td><code>offerId</code></td><td>—</td><td><code>POST …/offers</code> → <code>data.id</code></td></tr>
+          <tr><td><code>roomId</code></td><td>—</td><td><code>PATCH /offers/:id</code> → <code>data.chatRoom.id</code></td></tr>
+        </table>
+        <div class="row" style="margin-top:8px">
+          <button class="sec" onclick="copyFlowEnvTable()">Copy Env as JSON</button>
+          <button class="ghost" onclick="downloadFlowEnv()">Download env JSON</button>
+        </div>
+      </div>
+
+      <ol class="steps" style="font-size:13px">
+        <li>
+          <b>1 — Register Customer (creates <code>customerToken</code> + <code>customerId</code>)</b><br>
+          <code>POST {{base}}/auth/register</code> — <b>Headers:</b> <code>Content-Type: application/json</code> (no Auth)<br>
+          <b>Body (raw JSON):</b> <kbd>{"name":"Postman Customer","phone":"01000000111","governorate":"القاهرة","city":"القاهرة"}</kbd>
+          <div style="margin:6px 0" class="row"><button class="pill" onclick="copyText(JSON.stringify({name:'Postman Customer',phone:'01000000111',governorate:'القاهرة',city:'القاهرة'},null,2))">Copy Body</button><button class="pill" onclick="copyText('POST '+getBase()+'/auth/register')">Copy URL</button></div>
+          <div style="background:#0b0e14;border:1px solid var(--border);border-radius:8px;padding:8px;font-size:11px;color:var(--muted)">→ Response <code>{data:{token,user:{id,phone}}}</code> — in Postman <b>Tests</b> tab add:<br><code>pm.environment.set("customerToken", pm.response.json().data.token); pm.environment.set("customerId", pm.response.json().data.user.id); pm.environment.set("customerPhone", pm.response.json().data.user.phone);</code><br> Phone is normalized to <code>+20…</code>; duplicates return <code>409 Phone already registered</code> — use a new random phone (<code>01000000xxx</code>).</div>
+        </li>
+        <li>
+          <b>2 — Register Technician (creates <code>techToken</code> + <code>techPhone</code>)</b><br>
+          <code>POST {{base}}/auth/technicians/register</code> — no Auth<br>
+          <kbd>{"fullName":"Postman Tech","phone":"01000000112","governorate":"القاهرة","specialty":"سباكة"}</kbd>
+          <div style="margin:6px 0" class="row"><button class="pill" onclick="copyText(JSON.stringify({fullName:'Postman Tech',phone:'01000000112',governorate:'القاهرة',specialty:'سباكة'},null,2))">Copy Body</button></div>
+          <div style="background:#0b0e14;border:1px solid var(--border);border-radius:8px;padding:8px;font-size:11px;color:var(--muted)">→ <code>{data:{token,technician:{phone,id}}}</code> — Tests:<br><code>pm.environment.set("techToken", pm.response.json().data.token); pm.environment.set("techPhone", pm.response.json().data.technician.phone);</code><br> Technicians are stored by phone as ID; same phone check as customers. If you re-use phone, expect <code>409</code>.</div>
+        </li>
+        <li>
+          <b>3 — Customer Creates Order ( <code>service-request</code> )</b><br>
+          <code>POST {{base}}/service-requests</code> — <b>Headers:</b> <code>Authorization: Bearer {{customerToken}}</code><br>
+          <kbd>{"userId":"{{customerId}}","userName":"Postman Customer","userPhone":"{{customerPhone}}","userGovernorate":"القاهرة","title":"سباكة - تسريب مياه","description":"تسريب تحت الحوض","budget":"500","serviceType":"plumbing"}</kbd><br>
+          <div style="margin:6px 0" class="row"><button class="pill" onclick="copyText(flowManualRequestBody())">Copy Body</button></div>
+          <div style="background:#0b0e14;border:1px solid var(--border);border-radius:8px;padding:8px;font-size:11px;color:var(--muted)">→ Returns <code>{data:{id,request:{status:"pending"}}}</code> — Tests:<br><code>pm.environment.set("requestId", pm.response.json().data.id);</code><br> Required fields per <code>src/modules/service-requests/serviceRequests.routes.ts:10</code>: <code>userId,userName,userPhone,userGovernorate,title,description,budget,serviceType</code>. Optional: <code>userRegion,scheduledDate,images</code>. Auth is <b>required</b> (401 otherwise).</div>
+        </li>
+        <li>
+          <b>4 — Technician Creates Offer on that Order</b><br>
+          <code>POST {{base}}/service-requests/{{requestId}}/offers</code> — <b>Headers:</b> <code>Authorization: Bearer {{techToken}}</code><br>
+          <kbd>{"price":450,"technicianName":"Postman Tech","message":"جاهز خلال 30 دقيقة + ضمان شهر"}</kbd>
+          <div style="margin:6px 0" class="row"><button class="pill" onclick="copyText(JSON.stringify({price:450,technicianName:'Postman Tech',message:'جاهز خلال 30 دقيقة + ضمان شهر'},null,2))">Copy Body</button></div>
+          <div style="background:#0b0e14;border:1px solid var(--border);border-radius:8px;padding:8px;font-size:11px;color:var(--muted)">→ Returns <code>{data:{id, requestId, technicianId, price, status:"pending"}}</code> — Tests:<br><code>pm.environment.set("offerId", pm.response.json().data.id);</code><br> Only <code>userType: technician</code> tokens can do this (<code>403 Only technicians…</code>). Server also emits <code>/requests → new_offer</code> and <code>/notifications → notification</code>. You can verify via <code>GET {{base}}/service-requests/{{requestId}}/offers</code> (no auth needed, returns list).</div>
+        </li>
+        <li>
+          <b>5 — Customer Lists Offers (confirm offer exists)</b><br>
+          <code>GET {{base}}/service-requests/{{requestId}}/offers</code> — no Auth required<br>
+          <span style="font-size:11px;color:var(--muted)">Returns array sorted desc. Should contain your <code>{{offerId}}</code>. Also try <code>GET {{base}}/service-requests?userId={{customerId}}</code> or <code>GET {{base}}/service-requests/{{requestId}}</code> to see <code>hasOffers:true</code>.</span>
+        </li>
+        <li>
+          <b>6 — Customer Accepts Offer (the "order accepted" moment)</b><br>
+          <code>PATCH {{base}}/offers/{{offerId}}</code> — <b>Headers:</b> <code>Authorization: Bearer {{customerToken}}</code><br>
+          <kbd>{"status":"accepted"}</kbd> — also supports <kbd>{"status":"rejected"}</kbd>
+          <div style="margin:6px 0" class="row"><button class="pill" onclick="copyText(JSON.stringify({status:'accepted'},null,2))">Copy Body</button></div>
+          <div style="background:#0b0e14;border:1px solid var(--border);border-radius:8px;padding:8px;font-size:11px;color:var(--muted)">→ Returns <code>{data:{offer, request:{status:"accepted", technicianId, acceptedPrice}, chatRoom:{id, clientId, technicianId}}}</code> — Tests:<br><code>pm.environment.set("roomId", pm.response.json().data.chatRoom.id);</code><br> This is the transactional step (<code>src/modules/offers/offers.routes.ts:112</code>): offer→accepted, request→accepted, other offers→rejected, <b>chat room + appointment auto-created</b>, notification to tech. Subsequent <code>PATCH /offers/:id</code> with same id is idempotent but will stay accepted.</div>
+        </li>
+        <li>
+          <b>7 — Verify side-effects (all after Accept)</b>
+          <ul style="margin:6px 0 6px 18px;font-size:12px">
+            <li><code>GET {{base}}/chat/rooms?userId={{customerId}}</code> — Auth: customer token — should list the new <code>roomId</code> (filter by <code>requestId</code>)</li>
+            <li><code>GET {{base}}/chat/rooms/{{roomId}}/messages?limit=50</code> — initially <code>[]</code></li>
+            <li><code>POST {{base}}/chat/rooms/{{roomId}}/messages</code> <kbd>{"senderId":"{{customerId}}","senderType":"user","message":"مرحبا"}</kbd> → triggers <code>new_message</code> on socket</li>
+            <li><code>GET {{base}}/appointments?requestId={{requestId}}</code> or <code>?userId={{customerId}}</code> — Auth required — shows <code>status:"scheduled"</code> (created in Accept)</li>
+            <li><code>GET {{base}}/service-requests/{{requestId}}</code> — <code>status:"accepted"</code>, <code>acceptedPrice:450</code></li>
+            <li>Socket: connect <code>/chat</code> with <code>auth:{token: {{customerToken}}}</code>, emit <code>join_room "{{roomId}}"</code>, listen <code>new_message</code></li>
+          </ul>
+          <div style="background:#0e3a2a;border:1px solid rgba(52,211,153,.3);border-radius:8px;padding:8px;font-size:11px;margin-top:6px"><b style="color:#34d399">Socket proof that Accept worked:</b> connect two Socket.IO clients (customer + tech) to <code>/chat</code> with their tokens, both <code>join_room</code> with <code>{{roomId}}</code>, then <code>send_message {roomId, senderId, senderType, message}</code> — both receive <code>new_message</code> via <code>src/socket/index.ts:65</code>. REST <code>POST /chat/rooms/:id/messages</code> also broadcasts the same event.</div>
+        </li>
+      </ol>
+
+      <details><summary>curl script for Steps 1→7 (copy-paste, sets shell vars)</summary>
+<pre id="manCurl" class="code">BASE=http://basseeyta.duckdns.org
+# 1. register customer
+CUST_RES=$(curl -s -X POST $BASE/auth/register -H 'Content-Type: application/json' \
+  -d '{"name":"Postman Customer","phone":"01000000111","governorate":"القاهرة","city":"القاهرة"}')
+echo "$CUST_RES" | python3 -m json.tool
+CUST_TOKEN=$(echo "$CUST_RES" | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['token'])")
+CUST_ID=$(echo "$CUST_RES" | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['user']['id'])")
+CUST_PHONE=$(echo "$CUST_RES" | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['user']['phone'])")
+echo "CUST $CUST_ID $CUST_PHONE"
+
+# 2. register technician
+TECH_RES=$(curl -s -X POST $BASE/auth/technicians/register -H 'Content-Type: application/json' \
+  -d '{"fullName":"Postman Tech","phone":"01000000112","governorate":"القاهرة","specialty":"سباكة"}')
+echo "$TECH_RES" | python3 -m json.tool
+TECH_TOKEN=$(echo "$TECH_RES" | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['token'])")
+TECH_PHONE=$(echo "$TECH_RES" | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['technician']['phone'])")
+
+# 3. create order (service-request)
+REQ_RES=$(curl -s -X POST $BASE/service-requests -H "Authorization: Bearer $CUST_TOKEN" -H 'Content-Type: application/json' \
+  -d "{\"userId\":\"$CUST_ID\",\"userName\":\"Postman Customer\",\"userPhone\":\"$CUST_PHONE\",\"userGovernorate\":\"القاهرة\",\"title\":\"سباكة - تسريب مياه بالمطبخ\",\"description\":\"تسريب تحت الحوض\",\"budget\":\"500\",\"serviceType\":\"plumbing\"}")
+echo "$REQ_RES" | python3 -m json.tool
+REQ_ID=$(echo "$REQ_RES" | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['id'])")
+echo "REQ $REQ_ID"
+
+# 4. tech creates offer
+OFFER_RES=$(curl -s -X POST $BASE/service-requests/$REQ_ID/offers -H "Authorization: Bearer $TECH_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"price":450,"technicianName":"Postman Tech","message":"جاهز خلال 30 دقيقة + ضمان شهر"}')
+echo "$OFFER_RES" | python3 -m json.tool
+OFFER_ID=$(echo "$OFFER_RES" | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['id'])")
+echo "OFFER $OFFER_ID"
+
+# 5. list offers (verify)
+curl -s $BASE/service-requests/$REQ_ID/offers | python3 -m json.tool
+
+# 6. customer accepts offer  -> creates chat room + appointment
+ACC_RES=$(curl -s -X PATCH $BASE/offers/$OFFER_ID -H "Authorization: Bearer $CUST_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"status":"accepted"}')
+echo "$ACC_RES" | python3 -m json.tool
+ROOM_ID=$(echo "$ACC_RES" | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['chatRoom']['id'])")
+echo "ROOM $ROOM_ID"
+
+# 7. verify
+curl -s -H "Authorization: Bearer $CUST_TOKEN" $BASE/chat/rooms?userId=$CUST_ID | python3 -m json.tool
+curl -s -H "Authorization: Bearer $CUST_TOKEN" $BASE/appointments?requestId=$REQ_ID | python3 -m json.tool
+curl -s $BASE/service-requests/$REQ_ID | python3 -m json.tool
+</pre>
+      <div class="row" style="margin-top:6px"><button class="sec" onclick="copyText(document.getElementById('manCurl').textContent)">Copy curl.sh</button><button class="ghost" onclick="downloadCurl()">Download curl.sh</button></div>
+      </details>
+    </div>
+
+    <!-- Tab: Export -->
+    <div id="flowTab-export" style="display:none">
+      <div class="grid">
+        <div>
+          <h3>Export Postman Collection (v2.1)</h3>
+          <p style="font-size:12px;color:var(--muted)">Imports into Postman as a ready-to-run collection with <b>7 requests + Tests</b> that auto-set <code>customerToken/techToken/requestId/offerId/roomId</code>. Uses <code>{{base}}</code> so switching between <code>duckdns</code> and <code>localhost</code> is one env edit.</p>
+          <div class="row">
+            <button class="teal" onclick="downloadCollection()">⬇ Download .postman_collection.json</button>
+            <button class="sec" onclick="copyCollection()">Copy Collection JSON</button>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <button class="ghost" onclick="copyFlowEnvTable()">Copy Env JSON</button>
+            <button class="sec" onclick="downloadCurl()">⬇ Download curl.sh</button>
+            <button class="ghost" onclick="copyText(document.getElementById('manCurl').textContent)">Copy curl.sh</button>
+          </div>
+          <div style="margin-top:10px;font-size:11px;color:var(--muted)">After importing: <b>1)</b> Import env JSON → select it top-right. <b>2)</b> Run requests top-to-bottom (or use Runner). <b>3)</b> Check <code>roomId</code> and socket chat in this page's <code>/chat</code> section.</div>
+          <details><summary style="font-size:12px">Postman Socket.IO quick steps (for chat after Accept)</summary>
+            <ul style="font-size:12px;color:var(--muted)">
+              <li>Postman → <b>New → Socket.IO</b> — URL <code>{{base}}</code> (keep <code>http://</code>), Namespace <code>/chat</code>, Auth <code>auth.token = {{customerToken}}</code> → Connect</li>
+              <li>Emit <code>join_room</code> with <code>"{{roomId}}"</code> (raw string). Add listener <code>new_message</code>.</li>
+              <li>Emit <code>send_message</code> <kbd>{"roomId":"{{roomId}}","senderId":"{{customerId}}","senderType":"user","message":"مرحبا من Postman"}</kbd></li>
+              <li>Other side: same but with <code>{{techToken}}</code>/<code>{{techPhone}}</code> as sender.</li>
+              <li>Notifications: <code>/notifications</code> → emit <code>subscribe "{{customerId}}"</code> listen <code>notification</code>; Requests feed: <code>/requests</code> → <code>subscribe_governorate "القاهرة"</code>.</li>
+            </ul>
+          </details>
+        </div>
+        <div>
+          <label>Collection Preview (live — uses current Base URL)</label>
+          <pre id="exportPreview" class="code" style="height:320px"></pre>
+          <label>Environment Preview</label>
+          <pre id="envPreview" class="code" style="height:140px"></pre>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- Quick Auth -->
   <div class="card">
-    <h2>2 — Quick Auth Helper (optional — auto-fills token + IDs)</h2>
+    <h2>3 — Quick Auth Helper (optional — auto-fills token + IDs)</h2>
     <p style="font-size:13px;color:var(--muted)">If you don't have a token, use mock OTP flow (requires <code>USE_MOCK_OTP=true</code> on server, which is true for dev &amp; the live VPS). This creates real JWT without Firebase.</p>
     <div class="grid">
       <div>
@@ -126,7 +401,7 @@ kbd{background:rgba(255,255,255,.06);padding:2px 6px;border-radius:6px;font-size
 
   <!-- REST tools -->
   <div class="card">
-    <h2>3 — REST Chat (HTTP)</h2>
+    <h2>4 — REST Chat (HTTP)</h2>
     <div class="grid">
       <div>
         <h3>Create / List Rooms</h3>
@@ -155,7 +430,7 @@ kbd{background:rgba(255,255,255,.06);padding:2px 6px;border-radius:6px;font-size
 
   <!-- Socket tools -->
   <div class="card">
-    <h2>4 — Socket.IO Live Chat (Namespace <code>/chat</code>)</h2>
+    <h2>5 — Socket.IO Live Chat (Namespace <code>/chat</code>)</h2>
     <div class="grid">
       <div>
         <div class="row">
@@ -190,10 +465,10 @@ kbd{background:rgba(255,255,255,.06);padding:2px 6px;border-radius:6px;font-size
     </div>
   </div>
 
-  <!-- Postman guide -->
+  <!-- Postman guide (extended reference) -->
   <div class="card" style="border-color:#3b82f6">
-    <h2>5 — How to Test with Postman (and other external tools)</h2>
-    <p style="font-size:13px;color:var(--muted)">This page itself is the easiest tester, but you can also reproduce everything from Postman, Insomnia, or any HTTP/WebSocket client. The API is plain Express + Socket.IO 4 — no extra setup.</p>
+    <h2>6 — Extended Reference: REST + Socket.IO Cheat Sheet</h2>
+    <p style="font-size:13px;color:var(--muted)">The full API surface: use this as a compact reference after running the E2E flow above. The automated runner already executes the highlighted path; this card lists every verbatim path + alternative socket flows.</p>
     <div class="grid">
       <div>
         <h3>A — REST (works in Postman, curl, any HTTP client)</h3>
@@ -209,32 +484,19 @@ kbd{background:rgba(255,255,255,.06);padding:2px 6px;border-radius:6px;font-size
               <b>Technician:</b> <code>POST {{base}}/auth/technicians/register</code> <kbd>{"fullName":"Tech","phone":"01000000112","governorate":"القاهرة"}</kbd>
             </div>
           </li>
-          <li><b>Create chat room (idempotent by requestId)</b><br><code>POST {{base}}/chat/rooms</code> — Headers: <code>Authorization: Bearer &lt;token&gt;</code><br>Body: <kbd>{"clientId":"&lt;user.id&gt;","technicianId":"&lt;tech.phone&gt;","requestId":"req_123","serviceType":"plumbing"}</kbd><br>→ returns <code>{data:{id: roomId}}</code> (reuse <code>requestId</code> returns same room)</li>
+          <li><b>Create chat room (idempotent by requestId) — usually auto-created at Accept, but manual works too</b><br><code>POST {{base}}/chat/rooms</code> — Headers: <code>Authorization: Bearer &lt;token&gt;</code><br>Body: <kbd>{"clientId":"&lt;user.id&gt;","technicianId":"&lt;tech.phone&gt;","requestId":"req_123","serviceType":"plumbing"}</kbd><br>→ returns <code>{data:{id: roomId}}</code> (reuse <code>requestId</code> returns same room)</li>
           <li><b>Send message via REST</b><br><code>POST {{base}}/chat/rooms/:id/messages</code> — Headers: <code>Authorization: Bearer &lt;token&gt;</code><br>Body: <kbd>{"senderId":"&lt;user.id&gt;","senderType":"user","message":"Hello"}</kbd> (senderType <code>user</code> | <code>technician</code>)<br>→ server saves + emits <code>new_message</code> to socket room + creates notification</li>
           <li><b>Read history</b><br><code>GET {{base}}/chat/rooms/:id/messages?limit=50</code> — sorted desc<br><code>GET {{base}}/chat/rooms?userId=&lt;id&gt;</code> — list rooms<br><code>GET {{base}}/chat/rooms/:id/unread?userId=&lt;id&gt;</code><br><code>PATCH {{base}}/chat/rooms/:id/read</code> Body: <kbd>{"userId":"&lt;id&gt;"}</kbd></li>
+          <li><b>Service Requests & Offers (order lifecycle)</b><br>
+            <code>POST {{base}}/service-requests</code> (cust token) — creates pending request<br>
+            <code>GET {{base}}/service-requests?userId=&lt;id&gt;&status=pending</code> — filter<br>
+            <code>POST {{base}}/service-requests/:id/offers</code> (tech token) — price etc<br>
+            <code>GET {{base}}/service-requests/:id/offers</code> — list<br>
+            <code>PATCH {{base}}/offers/:id {"status":"accepted"}</code> (cust token) — creates chatRoom + appointment<br>
+            <code>GET {{base}}/appointments?requestId=:id</code> — scheduled<br>
+            <code>GET {{base}}/service-requests/:id</code> — still pending vs accepted
+          </li>
         </ol>
-        <details><summary style="cursor:pointer;font-size:13px">curl example (copy-paste)</summary>
-<pre style="background:#0b0e14;border:1px solid var(--border);padding:10px;border-radius:8px;overflow:auto;font-size:12px">BASE=http://basseeyta.duckdns.org
-# 1. register customer
-curl -s -X POST $BASE/auth/register -H 'Content-Type: application/json' \
-  -d '{"name":"Cust","phone":"01000000111","governorate":"القاهرة"}' | tee /tmp/res
-TOKEN=$(cat /tmp/res | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['token'])")
-echo $TOKEN
-
-# 2. register tech
-curl -s -X POST $BASE/auth/technicians/register -H 'Content-Type: application/json' \
-  -d '{"fullName":"Tech","phone":"01000000112","governorate":"القاهرة"}'
-
-# 3. create room
-ROOM=$(curl -s -X POST $BASE/chat/rooms -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"clientId":"<userId_from_register>","technicianId":"01000000112","requestId":"req_demo_1"}' | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['id'])")
-echo $ROOM
-
-# 4. send message
-curl -s -X POST $BASE/chat/rooms/$ROOM/messages -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"senderId":"<userId>","senderType":"user","message":"hello via curl"}'
-</pre>
-        </details>
       </div>
       <div>
         <h3>B — Socket.IO (Postman Socket.IO, or browser)</h3>
@@ -248,13 +510,13 @@ curl -s -X POST $BASE/chat/rooms/$ROOM/messages -H "Authorization: Bearer $TOKEN
               <li>Click <b>Connect</b> — you should see <code>[socket:/chat] connected &lt;id&gt;</code> in server logs (<code>pm2 logs</code>)</li>
             </ul>
           </li>
-          <li><b>Join a room</b><br>Event: <code>join_room</code> — Message: <kbd>"&lt;roomId&gt;"</kbd> (string, not JSON). Use the ID from <code>POST /chat/rooms</code>. Click <b>Send</b>. Server logs: <code>joined room:&lt;id&gt;</code></li>
+          <li><b>Join a room</b><br>Event: <code>join_room</code> — Message: <kbd>"&lt;roomId&gt;"</kbd> (string, not JSON). Use the ID from <code>POST /chat/rooms</code> or from <code>PATCH /offers/:id → data.chatRoom.id</code>. Click <b>Send</b>. Server logs: <code>joined room:&lt;id&gt;</code></li>
           <li><b>Listen</b><br>Add listener for event <code>new_message</code> — Postman: <b>Add listener</b> → Event name <code>new_message</code> — you'll receive:<br><kbd>{"id":"...","roomId":"...","senderId":"...","senderType":"user","message":"...","createdAt":"..."}</kbd> for every message in that room (including from REST).</li>
           <li><b>Send via socket</b><br>Event: <code>send_message</code> — Message (JSON):<br><kbd>{"roomId":"&lt;roomId&gt;","senderId":"&lt;userId&gt;","senderType":"user","message":"Hello from Postman"}</kbd><br>→ All members in room get <code>new_message</code> instantly. Check <code>GET /chat/rooms/:id/messages</code> to see persistence.</li>
           <li><b>Other namespaces</b>
             <ul style="margin:6px 0 6px 18px">
               <li><code>/notifications</code>: connect, emit <code>subscribe</code> with <kbd>"&lt;userId&gt;"</kbd>, listen <code>notification</code></li>
-              <li><code>/requests</code>: connect, emit <code>subscribe_governorate</code> with <kbd>"القاهرة"</kbd>, listen for future request broadcasts (via <code>POST /service-requests</code> push — currently server only joins, broadcast happens on service creation via FCM; socket room is <code>gov:&lt;name&gt;</code>)</li>
+              <li><code>/requests</code>: connect, emit <code>subscribe_governorate</code> with <kbd>"القاهرة"</kbd>, listen for <code>new_offer</code> (emitted on offer creation via <code>src/modules/offers/offers.routes.ts:95</code>)</li>
             </ul>
           </li>
           <li><b>Leave</b><br>Emit <code>leave_room</code> with <kbd>"&lt;roomId&gt;"</kbd> to stop receiving.</li>
@@ -272,12 +534,14 @@ s.emit('send_message',{roomId:'&lt;roomId&gt;',senderId:'&lt;userId&gt;',senderT
             <li><b>Nginx 400 / CORS:</b> Ensure <code>nginx/basita.conf</code> has <code>location /socket.io/</code> with <code>proxy_set_header Upgrade</code> and <code>Connection "upgrade"</code> (it does). Restart: <code>sudo nginx -t &amp;&amp; sudo systemctl restart nginx</code></li>
             <li><b>Uses <code>http://</code> not <code>https://</code></b> — VPS is currently <code>http://basseeyta.duckdns.org</code> (no cert). Don't use <code>wss://</code>.</li>
             <li><b>Auth ignored but logged:</b> Server middleware logs <code>[socket] auth failed</code> but still connects (dev). For production, change <code>src/socket/index.ts:19</code> from <code>return next()</code> to <code>return next(new Error('Unauthorized'))</code> to enforce.</li>
-            <li><b>Room not found:</b> Socket <code>send_message</code> creates message even if room missing, but REST requires room. Always <code>POST /chat/rooms</code> first.</li>
+            <li><b>Room not found:</b> Socket <code>send_message</code> creates message even if room missing, but REST requires room. Always <code>POST /chat/rooms</code> or accept an offer first.</li>
             <li><b>Transport:</b> Postman and browser auto-negotiate <code>polling → websocket</code>. If blocked, force <code>transports:['websocket']</code> but Nginx must allow upgrade.</li>
+            <li><b>Order 403 on offer:</b> Only technicians can POST offers. Be sure you use <code>techToken</code> (from <code>/auth/technicians/register</code>).</li>
+            <li><b>Offer 404 / request not found:</b> The requestId must be the UUID from <code>POST /service-requests</code> <code>data.id</code> (not the placeholder you typed).</li>
           </ul>
         </details>
         <div style="margin-top:10px;background:#0e3a2a;border:1px solid rgba(52,211,153,.3);border-radius:8px;padding:10px;font-size:12px">
-          <b style="color:#34d399">Does it work?</b> Yes — verified in code: <code>src/socket/index.ts:32-73</code> implements <code>/chat</code> with <code>join_room</code>/<code>leave_room</code>/<code>send_message</code> → <code>new_message</code> broadcast, backed by in-memory <code>store.chatMessages</code> (and pg when configured). REST + Socket both emit via <code>getIo()</code>. Nginx proxies <code>/socket.io/</code> correctly. Tested via smoke script: REST chat passes 6/6 checks.
+          <b style="color:#34d399">Does it work?</b> Yes — verified in code: <code>src/socket/index.ts:32-73</code> implements <code>/chat</code> with <code>join_room</code>/<code>leave_room</code>/<code>send_message</code> → <code>new_message</code> broadcast, backed by in-memory <code>store.chatMessages</code> (and pg when configured). REST + Socket both emit via <code>getIo()</code>. Nginx proxies <code>/socket.io/</code> correctly. Offers → accept path verified via <code>src/modules/offers/offers.routes.ts:112</code>.
         </div>
       </div>
     </div>
@@ -296,8 +560,8 @@ const log = (el, msg, type='info') => {
   if(type==='ok') d.style.color='var(--ok)';
   el.appendChild(d); el.scrollTop = el.scrollHeight;
 };
-const copyText = t => navigator.clipboard.writeText(t).then(()=>alert('Copied: '+t));
-const getBase = () => { let u = $('baseUrl').value.trim().replace(/\/+$/,''); if(!u) u='http://basseeyta.duckdns.org'; if(!u.startsWith('http')) u='http://'+u; $('chatUrlPreview').textContent = u+'/chat'; $('pmBase').textContent=u; $('pmSocketUrl').textContent=u; return u; };
+const copyText = t => navigator.clipboard.writeText(t).then(()=>alert('Copied: '+t.slice(0,120)+(t.length>120?'…':'')));
+const getBase = () => { let u = $('baseUrl').value.trim().replace(/\/+$/,''); if(!u) u='http://basseeyta.duckdns.org'; if(!u.startsWith('http')) u='http://'+u; if($('chatUrlPreview')) $('chatUrlPreview').textContent = u+'/chat'; if($('pmBase')) $('pmBase').textContent=u; if($('pmSocketUrl')) $('pmSocketUrl').textContent=u; if($('flowBasePreview')) $('flowBasePreview').textContent=u; if($('manBase')) $('manBase').textContent=u; refreshExportPreview(); return u; };
 const getToken = () => $('token').value.trim();
 function saveConfig(){ localStorage.setItem('basita_base', $('baseUrl').value); localStorage.setItem('basita_token', $('token').value); localStorage.setItem('basita_room', $('roomId').value); localStorage.setItem('basita_client', $('clientId').value); localStorage.setItem('basita_tech', $('techId').value); localStorage.setItem('basita_req', $('requestId').value); localStorage.setItem('basita_sender', $('senderId').value); $('cfgStatus').textContent='Saved ✓'; $('cfgStatus').className='badge ok'; getBase(); }
 function loadConfig(){ $('baseUrl').value=localStorage.getItem('basita_base')||'http://basseeyta.duckdns.org'; $('token').value=localStorage.getItem('basita_token')||''; $('roomId').value=localStorage.getItem('basita_room')||''; $('clientId').value=localStorage.getItem('basita_client')||''; $('techId').value=localStorage.getItem('basita_tech')||''; $('requestId').value=localStorage.getItem('basita_req')||''; $('senderId').value=localStorage.getItem('basita_sender')||''; getBase(); $('cfgStatus').textContent='Loaded'; $('cfgStatus').className='badge ok'; updateCreateBody(); }
@@ -306,16 +570,26 @@ function generateDemoIds(){ const id=()=>Math.random().toString(36).slice(2,9); 
 function useIdsFromToken(){ try{ const t=getToken(); if(!t) return alert('Paste token first'); const p=JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))); $('senderId').value=p.sub||''; $('clientId').value=p.sub||$('clientId').value; log($('socketLog'), 'Decoded token: '+JSON.stringify(p), 'ok'); }catch(e){ log($('socketLog'), 'Token decode failed: '+e.message, 'err'); } }
 function updateCreateBody(){ syncCreateBody(); }
 function syncCreateBody(){ const body={clientId:$('clientId').value||'USER_ID', technicianId:$('techId').value||'TECH_PHONE', requestId:$('requestId').value||'req_demo_1', serviceType:'plumbing'}; $('createRoomBody').value=JSON.stringify(body,null,2); }
-$('baseUrl').addEventListener('input', getBase);
-$('clientId').addEventListener('input', syncCreateBody);
-$('techId').addEventListener('input', syncCreateBody);
-$('requestId').addEventListener('input', syncCreateBody);
+if($('baseUrl')) $('baseUrl').addEventListener('input', getBase);
+if($('clientId')) $('clientId').addEventListener('input', syncCreateBody);
+if($('techId')) $('techId').addEventListener('input', syncCreateBody);
+if($('requestId')) $('requestId').addEventListener('input', syncCreateBody);
 
+// ---------- Generic API ----------
 async function api(path, opts={}){
   const base=getBase();
   const headers={'Content-Type':'application/json', ...(opts.headers||{})};
   const t=getToken();
   if(t && !opts.noAuth) headers['Authorization']='Bearer '+t;
+  const res=await fetch(base+path, {...opts, headers});
+  const text=await res.text();
+  let data; try{ data=JSON.parse(text)}catch{ data=text}
+  return {ok:res.ok, status:res.status, data, raw:text};
+}
+async function apiWithToken(path, token, opts={}){
+  const base=getBase();
+  const headers={'Content-Type':'application/json', ...(opts.headers||{})};
+  if(token) headers['Authorization']='Bearer '+token;
   const res=await fetch(base+path, {...opts, headers});
   const text=await res.text();
   let data; try{ data=JSON.parse(text)}catch{ data=text}
@@ -376,7 +650,6 @@ async function fetchMessages(){
   if(Array.isArray(msgs)){ log($('restMsgs'), `history ${msgs.length} msgs:\n`+JSON.stringify(msgs,null,2)); renderRestHistory(msgs); } else log($('restMsgs'), JSON.stringify(r.data,null,2));
 }
 function renderRestHistory(msgs){
-  // also render in live area as history marker
   const c=$('liveMsgs'); c.innerHTML='';
   if(!msgs.length) c.innerHTML='<div style="color:var(--muted);text-align:center;padding:20px">No messages in room</div>';
   else msgs.slice().reverse().forEach(m=> addLiveBubble(m, true));
@@ -468,8 +741,294 @@ function connectRequests(){
   reqSocket.onAny((ev,...a)=> log($('otherLog'), `${ev} ${JSON.stringify(a).slice(0,200)}`));
 }
 
+// ---------- E2E Flow Logic ----------
+let flowState = {
+  custToken:'', custId:'', custPhone:'', custName:'',
+  techToken:'', techId:'', techPhone:'', techName:'',
+  requestId:'', offerId:'', roomId:'', appointmentId:'', gov:''
+};
+function loadFlowState(){
+  try{ const s=JSON.parse(localStorage.getItem('basita_flow')||'{}'); flowState={...flowState, ...s}; }catch{}
+  updateFlowVarsUI();
+}
+function saveFlowState(){
+  localStorage.setItem('basita_flow', JSON.stringify(flowState));
+  updateFlowVarsUI(); refreshExportPreview();
+}
+function updateFlowVarsUI(){
+  $('vBase').textContent = getBase();
+  $('vCustId').textContent = flowState.custId||'-';
+  $('vCustPhone').textContent = flowState.custPhone||'-';
+  $('vCustToken').textContent = flowState.custToken?flowState.custToken.slice(0,26)+'…':'-';
+  $('vCustToken').title = flowState.custToken||'';
+  $('vTechId').textContent = flowState.techId||flowState.techPhone||'-';
+  $('vTechToken').textContent = flowState.techToken?flowState.techToken.slice(0,26)+'…':'-';
+  $('vTechToken').title = flowState.techToken||'';
+  $('vReqId').textContent = flowState.requestId||'-';
+  $('vOfferId').textContent = flowState.offerId||'-';
+  $('vRoomId').textContent = flowState.roomId||'-';
+  $('vApptId').textContent = flowState.appointmentId||'-';
+  // also reflect base
+  if(flowState.gov) $('flowGov').value = flowState.gov;
+}
+function setFlowStatus(t, cls='warn'){ $('flowStatus').textContent=t; $('flowStatus').className='badge '+cls; }
+function setFlowStep(n, state){ const el=$('flowS'+n); if(!el) return; el.classList.remove('active','done'); if(state) el.classList.add(state); }
+function flowProgress(p){ $('flowProgress').style.width=p+'%'; }
+function logFlow(msg, type='info'){ log($('flowLog'), msg, type); }
+function randPhone(){ return '01000000'+Math.floor(10000+Math.random()*90000); }
+function flowReset(){
+  flowState={custToken:'',custId:'',custPhone:'',custName:'',techToken:'',techId:'',techPhone:'',techName:'',requestId:'',offerId:'',roomId:'',appointmentId:'',gov: $('flowGov').value};
+  for(let i=1;i<=6;i++) setFlowStep(i,'');
+  flowProgress(0); setFlowStatus('idle','warn'); saveFlowState();
+  logFlow('Reset — variables cleared. Ready.', 'warn');
+  $('flowVerify').textContent='Not verified yet…';
+}
+async function flowStep1(){
+  setFlowStep(1,'active'); setFlowStatus('1/6 registering customer…','warn'); flowProgress(10);
+  const name=$('flowCustName').value.trim()||'Postman Customer';
+  let phone=$('flowCustPhone').value.trim(); if(!phone) { phone=randPhone(); $('flowCustPhone').value=phone; }
+  const gov=$('flowGov').value.trim()||'القاهرة';
+  const body={name, phone, governorate:gov, city:gov};
+  logFlow(`POST /auth/register ${JSON.stringify(body)}`);
+  const r=await apiWithToken('/auth/register', null, {method:'POST', body:JSON.stringify(body)});
+  logFlow(`→ ${r.status} ${JSON.stringify(r.data).slice(0,600)}`, r.ok?'ok':'err');
+  if(!r.ok){ setFlowStep(1,''); setFlowStatus('cust register failed: '+(r.data?.message||r.status),'err'); return false; }
+  flowState.custToken=r.data?.data?.token||''; flowState.custId=r.data?.data?.user?.id||''; flowState.custPhone=r.data?.data?.user?.phone||phone; flowState.custName=name; flowState.gov=gov;
+  // sync to top config (customer is primary)
+  $('token').value=flowState.custToken; $('clientId').value=flowState.custId; $('senderId').value=flowState.custId; $('senderType').value='user'; saveConfig();
+  setFlowStep(1,'done'); flowProgress(20); setFlowStatus('customer ok: '+flowState.custId.slice(0,8),'ok'); saveFlowState();
+  logFlow(`Cust token stored (sub=${flowState.custId})`, 'ok');
+  return true;
+}
+async function flowStep2(){
+  setFlowStep(2,'active'); setFlowStatus('2/6 registering technician…','warn'); flowProgress(30);
+  const fullName=$('flowTechName').value.trim()||'Postman Tech';
+  let phone=$('flowTechPhone').value.trim(); if(!phone){ phone=randPhone(); $('flowTechPhone').value=phone; }
+  const gov=$('flowGov').value.trim()||'القاهرة';
+  const body={fullName, phone, governorate:gov, specialty:'سباكة'};
+  logFlow(`POST /auth/technicians/register ${JSON.stringify(body)}`);
+  const r=await apiWithToken('/auth/technicians/register', null, {method:'POST', body:JSON.stringify(body)});
+  logFlow(`→ ${r.status} ${JSON.stringify(r.data).slice(0,600)}`, r.ok?'ok':'err');
+  if(!r.ok){ setFlowStep(2,''); setFlowStatus('tech register failed: '+(r.data?.message||r.status),'err'); return false; }
+  flowState.techToken=r.data?.data?.token||''; flowState.techPhone=r.data?.data?.technician?.phone||phone; flowState.techId=flowState.techPhone; flowState.techName=fullName;
+  $('techId').value=flowState.techPhone; saveConfig();
+  setFlowStep(2,'done'); flowProgress(40); setFlowStatus('tech ok: '+flowState.techPhone,'ok'); saveFlowState();
+  logFlow(`Tech token stored (phone=${flowState.techPhone})`, 'ok');
+  return true;
+}
+async function flowStep3(){
+  setFlowStep(3,'active'); setFlowStatus('3/6 creating order…','warn'); flowProgress(50);
+  if(!flowState.custToken||!flowState.custId){ logFlow('Need customer first — run step 1', 'err'); setFlowStep(3,''); return false; }
+  const gov=$('flowGov').value.trim()||flowState.gov||'القاهرة';
+  const serviceType=$('flowServiceType').value;
+  const budget=$('flowBudget').value.trim()||'500';
+  const title=$('flowTitle').value.trim()||'سباكة - تسريب مياه بالمطبخ';
+  const description=$('flowDesc').value.trim()||'تسريب تحت الحوض';
+  const body={userId:flowState.custId, userName:flowState.custName||'Postman Customer', userPhone:flowState.custPhone, userGovernorate:gov, title, description, budget, serviceType, scheduledDate:'الآن'};
+  logFlow(`POST /service-requests (cust token) ${JSON.stringify(body).slice(0,200)}`);
+  const r=await apiWithToken('/service-requests', flowState.custToken, {method:'POST', body:JSON.stringify(body)});
+  logFlow(`→ ${r.status} ${JSON.stringify(r.data).slice(0,600)}`, r.ok?'ok':'err');
+  if(!r.ok){ setFlowStep(3,''); setFlowStatus('create order failed: '+(r.data?.message||r.status),'err'); return false; }
+  flowState.requestId=r.data?.data?.id||r.data?.data?.request?.id||'';
+  flowState.gov=gov;
+  $('requestId').value=flowState.requestId; saveConfig();
+  setFlowStep(3,'done'); flowProgress(62); setFlowStatus('order '+flowState.requestId.slice(0,8)+' pending','ok'); saveFlowState();
+  logFlow(`Request ${flowState.requestId} created (pending)`, 'ok');
+  return true;
+}
+async function flowStep4(){
+  setFlowStep(4,'active'); setFlowStatus('4/6 tech creating offer…','warn'); flowProgress(70);
+  if(!flowState.techToken){ logFlow('Need tech token — run step 2','err'); setFlowStep(4,''); return false; }
+  if(!flowState.requestId){ logFlow('Need requestId — run step 3','err'); setFlowStep(4,''); return false; }
+  const price=Number($('flowOfferPrice').value||450);
+  const body={price, technicianName:flowState.techName||'Postman Tech', message:'جاهز خلال 30 دقيقة + ضمان شهر', arrivalTime:'خلال 30 دقيقة', warranty:'شهر'};
+  logFlow(`POST /service-requests/${flowState.requestId}/offers (tech token) ${JSON.stringify(body)}`);
+  const r=await apiWithToken('/service-requests/'+encodeURIComponent(flowState.requestId)+'/offers', flowState.techToken, {method:'POST', body:JSON.stringify(body)});
+  logFlow(`→ ${r.status} ${JSON.stringify(r.data).slice(0,600)}`, r.ok?'ok':'err');
+  if(!r.ok){ setFlowStep(4,''); setFlowStatus('offer failed: '+(r.data?.message||r.status),'err'); return false; }
+  flowState.offerId=r.data?.data?.id||'';
+  setFlowStep(4,'done'); flowProgress(80); setFlowStatus('offer '+flowState.offerId.slice(0,8)+' pending','ok'); saveFlowState();
+  logFlow(`Offer ${flowState.offerId} @ ${price} created`, 'ok');
+  return true;
+}
+async function flowStep4b(){
+  if(!flowState.requestId) return alert('Run step 3 first (requestId)');
+  const r=await apiWithToken('/service-requests/'+encodeURIComponent(flowState.requestId)+'/offers', flowState.custToken||null, {method:'GET', headers:{}});
+  // GET offers does not need auth but we pass cust token anyway
+  const base=getBase();
+  const res=await fetch(base+'/service-requests/'+encodeURIComponent(flowState.requestId)+'/offers');
+  const j=await res.json();
+  logFlow(`GET /service-requests/${flowState.requestId}/offers → ${res.status} count=${Array.isArray(j?.data)?j.data.length:'?'} ${JSON.stringify(j).slice(0,500)}`, res.ok?'ok':'err');
+  if(Array.isArray(j?.data) && j.data[0] && !flowState.offerId){ flowState.offerId=j.data[0].id; saveFlowState(); logFlow('Auto-filled offerId from list: '+flowState.offerId,'ok'); }
+}
+async function flowStep5(){
+  setFlowStep(5,'active'); setFlowStatus('5/6 accepting offer…','warn'); flowProgress(88);
+  if(!flowState.custToken){ logFlow('Need customer token','err'); setFlowStep(5,''); return false; }
+  if(!flowState.offerId){ logFlow('Need offerId — run step 4','err'); setFlowStep(5,''); return false; }
+  logFlow(`PATCH /offers/${flowState.offerId} {"status":"accepted"} (cust token)`);
+  const r=await apiWithToken('/offers/'+encodeURIComponent(flowState.offerId), flowState.custToken, {method:'PATCH', body:JSON.stringify({status:'accepted'})});
+  logFlow(`→ ${r.status} ${JSON.stringify(r.data).slice(0,800)}`, r.ok?'ok':'err');
+  if(!r.ok){ setFlowStep(5,''); setFlowStatus('accept failed: '+(r.data?.message||r.status),'err'); return false; }
+  flowState.roomId=r.data?.data?.chatRoom?.id||r.data?.chatRoom?.id||'';
+  // appointment may be in separate: fetch
+  flowState.requestId=r.data?.data?.request?.id||flowState.requestId;
+  if(flowState.roomId){ $('roomId').value=flowState.roomId; saveConfig(); }
+  setFlowStep(5,'done'); flowProgress(94); setFlowStatus('accepted → room '+ (flowState.roomId?flowState.roomId.slice(0,8):'?'),'ok'); saveFlowState();
+  logFlow(`Accepted! request now accepted, room=${flowState.roomId}`, 'ok');
+  // auto verify next
+  await flowStep6(true);
+  return true;
+}
+async function flowStep6(silent){
+  if(!silent) { setFlowStep(6,'active'); setFlowStatus('6/6 verifying…','warn'); }
+  flowProgress(97);
+  const base=getBase();
+  const vEl=$('flowVerify'); vEl.textContent='';
+  const addV=(t)=>{ const d=document.createElement('div'); d.textContent=t; vEl.appendChild(d); };
+  try{
+    if(flowState.requestId){
+      const r=await apiWithToken('/service-requests/'+encodeURIComponent(flowState.requestId), flowState.custToken, {method:'GET'});
+      // fallback no auth for public? service-requests/:id has no auth but use fetch
+      const res=await fetch(base+'/service-requests/'+encodeURIComponent(flowState.requestId));
+      const j=await res.json().catch(()=>null);
+      const data=j?.data||r.data?.data||{};
+      addV(`GET /service-requests/${flowState.requestId} → ${res.status} status=${data.status||'?'} acceptedPrice=${data.acceptedPrice||'-'} technicianId=${data.technicianId||'-'}`);
+      vEl.appendChild(document.createTextNode(JSON.stringify(data,null,2).slice(0,800)));
+    }
+    if(flowState.roomId){
+      const res=await fetch(base+'/chat/rooms/'+encodeURIComponent(flowState.roomId)+'/messages?limit=5', {headers:{'Authorization':'Bearer '+flowState.custToken}});
+      const j=await res.json().catch(()=>null);
+      addV(`\nGET /chat/rooms/${flowState.roomId}/messages → ${res.status} count=${Array.isArray(j?.data)?j.data.length:'?'}`);
+    } else if(flowState.custId){
+      const res=await fetch(base+'/chat/rooms?userId='+encodeURIComponent(flowState.custId), {headers:{'Authorization':'Bearer '+flowState.custToken}});
+      const j=await res.json().catch(()=>null);
+      addV(`\nGET /chat/rooms?userId=${flowState.custId} → ${res.status} rooms=${Array.isArray(j?.data)?j.data.length:'?'}` + (j?.data?.[0]?.id? ` first=${j.data[0].id}`:''));
+      if(Array.isArray(j?.data)&&j.data[0]?.id && !flowState.roomId){ flowState.roomId=j.data[0].id; $('roomId').value=flowState.roomId; saveConfig(); saveFlowState(); addV(`(auto-captured roomId ${flowState.roomId})`); }
+    }
+    if(flowState.requestId){
+      const res=await fetch(base+'/appointments?requestId='+encodeURIComponent(flowState.requestId), {headers:{'Authorization':'Bearer '+flowState.custToken}});
+      const j=await res.json().catch(()=>null);
+      const appt=Array.isArray(j?.data)?j.data[0]:j?.data;
+      addV(`\nGET /appointments?requestId=${flowState.requestId} → ${res.status} ${appt?`found ${appt.id} status=${appt.status} price=${appt.price}`:'not found'}`);
+      if(appt?.id) { flowState.appointmentId=appt.id; saveFlowState(); }
+      vEl.appendChild(document.createTextNode('\n'+JSON.stringify(appt||j,null,2).slice(0,900)));
+    }
+    // verify offers list
+    if(flowState.requestId){
+      const res=await fetch(base+'/service-requests/'+encodeURIComponent(flowState.requestId)+'/offers');
+      const j=await res.json().catch(()=>null);
+      addV(`\nGET /…/${flowState.requestId}/offers → ${res.status} offers=${Array.isArray(j?.data)?j.data.length:'?'}`);
+    }
+    vEl.scrollTop=vEl.scrollHeight;
+    setFlowStep(6,'done'); flowProgress(100); setFlowStatus('verified ✓ — order accepted','ok');
+    logFlow('Verification done — see Verification Preview. You can now "Join Socket Room" or test chat.', 'ok');
+  }catch(e){
+    addV('Verify error: '+e.message); setFlowStep(6,''); setFlowStatus('verify error','err');
+  }
+}
+async function flowRunAll(){
+  logFlow('=== Run Full Flow 1→6 ===','ok');
+  for(let i=1;i<=6;i++) setFlowStep(i,'');
+  flowProgress(0);
+  if(!await flowStep1()) return;
+  await new Promise(r=>setTimeout(r,300));
+  if(!await flowStep2()) return;
+  await new Promise(r=>setTimeout(r,300));
+  if(!await flowStep3()) return;
+  await new Promise(r=>setTimeout(r,300));
+  if(!await flowStep4()) return;
+  await new Promise(r=>setTimeout(r,300));
+  if(!await flowStep5()) return;
+  logFlow('=== Full Flow COMPLETE === room='+flowState.roomId+' appointment='+flowState.appointmentId, 'ok');
+}
+function syncVarsToTopConfig(){
+  if(flowState.custToken) $('token').value=flowState.custToken;
+  if(flowState.custId) { $('clientId').value=flowState.custId; $('senderId').value=flowState.custId; $('senderType').value='user'; }
+  if(flowState.techPhone) $('techId').value=flowState.techPhone;
+  if(flowState.requestId) $('requestId').value=flowState.requestId;
+  if(flowState.roomId) $('roomId').value=flowState.roomId;
+  saveConfig(); syncCreateBody();
+  alert('Pushed flow vars → top Config. Now "Connect /chat" + "join_room" will use the accepted order\'s room.');
+}
+function flowManualRequestBody(){
+  const gov=$('flowGov').value||'القاهرة'; const st=$('flowServiceType').value||'plumbing';
+  const b={userId:flowState.custId||'{{customerId}}', userName:flowState.custName||'Postman Customer', userPhone:flowState.custPhone||'{{customerPhone}}', userGovernorate:gov, title:$('flowTitle').value||'سباكة - تسريب مياه', description:$('flowDesc').value||'تسريب تحت الحوض', budget:$('flowBudget').value||'500', serviceType:st};
+  return JSON.stringify(b,null,2);
+}
+function flowJoinSocketAfterAccept(){
+  if(!flowState.roomId) return alert('No roomId — run flow through Accept first');
+  syncVarsToTopConfig();
+  if(!chatSocket || !chatSocket.connected) connectChat();
+  setTimeout(()=> joinRoom(), 600);
+}
+
+// --- Postman export helpers ---
+function buildCollection(){
+  const base=getBase();
+  return {
+    info:{name:"Basseeyta E2E – Register → Order → Accept", description:"Auto-generated from socket-test.html flow. Run top-to-bottom; Tests auto-set env vars.", schema:"https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+    variable:[{key:"base", value:base}],
+    item:[
+      {name:"1 Register Customer", request:{method:"POST", url:{raw:"{{base}}/auth/register", host:["{{base}}"], path:["auth","register"]}, header:[{key:"Content-Type", value:"application/json"}], body:{mode:"raw", raw:JSON.stringify({name:"Postman Customer", phone:"01000000111", governorate:"القاهرة", city:"القاهرة"},null,2)}}, event:[{listen:"test", script:{exec:["pm.test('201 customer',()=> pm.response.to.have.status(201));","const j=pm.response.json();","pm.environment.set('customerToken', j.data.token);","pm.environment.set('customerId', j.data.user.id);","pm.environment.set('customerPhone', j.data.user.phone);"]}}]},
+      {name:"2 Register Technician", request:{method:"POST", url:{raw:"{{base}}/auth/technicians/register", host:["{{base}}"], path:["auth","technicians","register"]}, header:[{key:"Content-Type", value:"application/json"}], body:{mode:"raw", raw:JSON.stringify({fullName:"Postman Tech", phone:"01000000112", governorate:"القاهرة", specialty:"سباكة"},null,2)}}, event:[{listen:"test", script:{exec:["pm.test('201 tech',()=> pm.response.to.have.status(201));","const j=pm.response.json();","pm.environment.set('techToken', j.data.token);","pm.environment.set('techPhone', j.data.technician.phone);"]}}]},
+      {name:"3 Create Order (service-request)", request:{method:"POST", url:{raw:"{{base}}/service-requests", host:["{{base}}"], path:["service-requests"]}, header:[{key:"Content-Type", value:"application/json"}, {key:"Authorization", value:"Bearer {{customerToken}}"}], body:{mode:"raw", raw:JSON.stringify({userId:"{{customerId}}", userName:"Postman Customer", userPhone:"{{customerPhone}}", userGovernorate:"القاهرة", title:"سباكة - تسريب مياه بالمطبخ", description:"تسريب تحت الحوض، محتاج فني بسرعة", budget:"500", serviceType:"plumbing", scheduledDate:"الآن"},null,2)}}, event:[{listen:"test", script:{exec:["pm.test('201 request',()=> pm.response.to.have.status(201));","pm.environment.set('requestId', pm.response.json().data.id);"]}}]},
+      {name:"4 Tech creates Offer", request:{method:"POST", url:{raw:"{{base}}/service-requests/{{requestId}}/offers", host:["{{base}}"], path:["service-requests","{{requestId}}","offers"]}, header:[{key:"Content-Type", value:"application/json"}, {key:"Authorization", value:"Bearer {{techToken}}"}], body:{mode:"raw", raw:JSON.stringify({price:450, technicianName:"Postman Tech", message:"جاهز خلال 30 دقيقة + ضمان شهر", arrivalTime:"خلال 30 دقيقة", warranty:"شهر"},null,2)}}, event:[{listen:"test", script:{exec:["pm.test('201 offer',()=> pm.response.to.have.status(201));","pm.environment.set('offerId', pm.response.json().data.id);"]}}]},
+      {name:"5 List Offers (verify)", request:{method:"GET", url:{raw:"{{base}}/service-requests/{{requestId}}/offers", host:["{{base}}"], path:["service-requests","{{requestId}}","offers"]}}},
+      {name:"6 Accept Offer (creates chatRoom + appointment)", request:{method:"PATCH", url:{raw:"{{base}}/offers/{{offerId}}", host:["{{base}}"], path:["offers","{{offerId}}"]}, header:[{key:"Content-Type", value:"application/json"}, {key:"Authorization", value:"Bearer {{customerToken}}"}], body:{mode:"raw", raw:JSON.stringify({status:"accepted"},null,2)}}, event:[{listen:"test", script:{exec:["pm.test('200 accepted',()=> pm.response.to.have.status(200));","const j=pm.response.json();","if(j.data.chatRoom) pm.environment.set('roomId', j.data.chatRoom.id);","pm.test('request accepted',()=> pm.expect(j.data.request.status).to.eql('accepted'));"]}}]},
+      {name:"7 Verify - Get request + appointments + chat room", request:{method:"GET", url:{raw:"{{base}}/service-requests/{{requestId}}", host:["{{base}}"], path:["service-requests","{{requestId}}"]}}},
+    ]
+  };
+}
+function buildEnv(){
+  const base=getBase();
+  return {name:"Basseeyta E2E", values:[
+    {key:"base", value:base, enabled:true},
+    {key:"customerToken", value:flowState.custToken||"", enabled:true},
+    {key:"customerId", value:flowState.custId||"", enabled:true},
+    {key:"customerPhone", value:flowState.custPhone||"", enabled:true},
+    {key:"techToken", value:flowState.techToken||"", enabled:true},
+    {key:"techPhone", value:flowState.techPhone||"", enabled:true},
+    {key:"requestId", value:flowState.requestId||"", enabled:true},
+    {key:"offerId", value:flowState.offerId||"", enabled:true},
+    {key:"roomId", value:flowState.roomId||"", enabled:true},
+  ], _postman_variable_scope:"environment", _postman_exported_at:new Date().toISOString(), _postman_exported_using:"Postman/10.0.0"};
+}
+function refreshExportPreview(){
+  const c=buildCollection(); const e=buildEnv();
+  if($('exportPreview')) $('exportPreview').textContent=JSON.stringify(c,null,2);
+  if($('envPreview')) $('envPreview').textContent=JSON.stringify(e,null,2);
+}
+function copyCollection(){ copyText(JSON.stringify(buildCollection(),null,2)); }
+function downloadCollection(){
+  const blob=new Blob([JSON.stringify(buildCollection(),null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='Basseeyta-E2E.postman_collection.json'; a.click();
+}
+function copyFlowEnvTable(){ copyText(JSON.stringify(buildEnv(),null,2)); }
+function downloadFlowEnv(){
+  const blob=new Blob([JSON.stringify(buildEnv(),null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='Basseeyta-E2E.postman_environment.json'; a.click();
+}
+function downloadCurl(){
+  const t=$('manCurl').textContent;
+  const blob=new Blob([t],{type:'text/x-sh'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='basseeyta-e2e.sh'; a.click();
+}
+function switchFlowTab(which){
+  for(const w of ['run','manual','export']){
+    $('flowTab-'+w).style.display = w===which ? '' : 'none';
+  }
+  for(const btn of document.querySelectorAll('#flowTabs button')){
+    btn.classList.toggle('active', btn.textContent.toLowerCase().includes(which));
+  }
+  // fix active exact
+  const map={run:0,manual:1,export:2};
+  document.querySelectorAll('#flowTabs button').forEach((b,i)=> b.classList.toggle('active', i===map[which]));
+  if(which==='export') refreshExportPreview();
+}
+
 // init
 loadConfig(); getBase(); syncCreateBody();
+loadFlowState(); refreshExportPreview();
 if(!$('clientId').value && !$('senderId').value) generateDemoIds();
 </script>
 </body>
