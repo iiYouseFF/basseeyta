@@ -47,6 +47,9 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 router.patch('/:userId', authMiddleware, async (req, res) => {
+  // Admin-only: only admin can approve/reject verifications
+  const user = (req as any).user;
+  if (user?.userType !== 'admin' && !user?.isAdmin) return sendError(res, 403, 'Admin access required to review verifications');
   const doc = store.verifications.get(req.params.userId);
   if (!doc) return sendError(res, 404, 'Verification not found');
   const schema = z.object({
@@ -57,7 +60,9 @@ router.patch('/:userId', authMiddleware, async (req, res) => {
   if (!parsed.success) return sendError(res, 400, 'Invalid status', parsed.error.errors);
   doc.status = parsed.data.status;
   doc.reviewedAt = parsed.data.reviewedAt || nowIso();
+  doc.reviewed_at = doc.reviewedAt;
   doc.updatedAt = nowIso();
+  doc.updated_at = doc.updatedAt;
   store.verifications.set(req.params.userId, doc);
   return sendSuccess(res, doc);
 });

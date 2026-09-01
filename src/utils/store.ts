@@ -27,6 +27,9 @@ export const store = {
   verifications: new Map<string, any>(), // userId -> verification
   promoCodes: new Map<string, any>(), // code -> promo
   promoById: new Map<string, any>(),
+  admins: new Map<string, any>(), // id -> admin
+  adminsByEmail: new Map<string, string>(), // email lower -> id
+  adminAuditLogs: [] as any[], // ordered list
 };
 
 export function genId(): string {
@@ -84,4 +87,27 @@ export function nowIso(): string {
     store.promoCodes.set(p.code, p);
     store.promoById.set(p.id, p);
   }
+})();
+
+// Seed superadmin — email: admin@basseeyta.com, password: basseytaAdmin123
+(function seedAdmin() {
+  const bcrypt = require('bcryptjs');
+  const email = 'admin@basseeyta.com';
+  const lower = email.toLowerCase();
+  if (store.adminsByEmail.has(lower)) return;
+  const id = genId();
+  const hash = bcrypt.hashSync('basseytaAdmin123', 10);
+  const admin = {
+    id,
+    email,
+    password_hash: hash,
+    name: 'Super Admin',
+    is_superadmin: true,
+    is_active: true,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+    created_at: nowIso(),
+  };
+  store.admins.set(id, admin);
+  store.adminsByEmail.set(lower, id);
 })();

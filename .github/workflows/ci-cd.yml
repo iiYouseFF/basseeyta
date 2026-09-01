@@ -59,6 +59,8 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npm run build
+      - run: npm ci --prefix admin
+      - run: npm run build --prefix admin
 
   deploy:
     name: Deploy to VPS
@@ -79,9 +81,11 @@ jobs:
             # Fix divergent branches after force-push (history rewrite for .env purge)
             git fetch origin main
             git reset --hard origin/main
-            # Install all deps (need tsc for build), then build, then prune to production
+            # Install all deps (need tsc for build), then build backend + admin, then prune to production
             npm ci
+            npm ci --prefix admin
             npm run build
+            npm run build --prefix admin
             # Reload or start PM2 (ecosystem.config.js is at repo root)
             if pm2 describe basita-api > /dev/null 2>&1; then
               pm2 reload ecosystem.config.js --env production --update-env

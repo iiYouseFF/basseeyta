@@ -9,3 +9,4 @@ coverage
 .idea
 uploads
 *.tsbuildinfo
+design_system.md

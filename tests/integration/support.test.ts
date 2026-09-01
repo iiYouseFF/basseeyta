@@ -4,6 +4,7 @@ import { createApp } from '../../src/app';
 describe('Support Integration', () => {
   const app = createApp();
   let token: string;
+  let adminToken: string;
   let userId: string;
   let ticketId: string;
 
@@ -15,6 +16,9 @@ describe('Support Integration', () => {
     });
     token = reg.body.data.token;
     userId = reg.body.data.user.id;
+    // Admin login for privileged PATCH
+    const adminLogin = await request(app).post('/admin/api/auth/login').send({ email: 'admin@basseeyta.com', password: 'basseytaAdmin123' });
+    adminToken = adminLogin.body.data?.token || token;
   });
 
   it('POST /support-tickets - create', async () => {
@@ -71,10 +75,10 @@ describe('Support Integration', () => {
     expect(res.status).toBe(404);
   });
 
-  it('PATCH /support-tickets/:id - update status', async () => {
+  it('PATCH /support-tickets/:id - update status (admin)', async () => {
     const res = await request(app)
       .patch(`/support-tickets/${ticketId}`)
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${adminToken}`)
       .send({ status: 'in_progress', adminReply: 'We are checking' });
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('in_progress');
@@ -83,8 +87,16 @@ describe('Support Integration', () => {
   it('PATCH /support-tickets/:id - invalid status', async () => {
     const res = await request(app)
       .patch(`/support-tickets/${ticketId}`)
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${adminToken}`)
       .send({ status: 'invalid' });
     expect(res.status).toBe(400);
+  });
+
+  it('PATCH /support-tickets/:id - non-admin forbidden for adminReply', async () => {
+    const res = await request(app)
+      .patch(`/support-tickets/${ticketId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'in_progress', adminReply: 'hacker' });
+    expect(res.status).toBe(403);
   });
 });

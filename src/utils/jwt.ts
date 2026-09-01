@@ -3,10 +3,12 @@ import { env } from '../config/env';
 import crypto from 'crypto';
 
 export interface JwtPayload {
-  sub: string; // userId
-  phone: string;
-  userType: 'user' | 'technician';
+  sub: string; // userId or adminId
+  phone: string; // phone or email for admin
+  userType: 'user' | 'technician' | 'admin';
   jti: string;
+  email?: string;
+  isAdmin?: boolean;
   iat?: number;
   exp?: number;
 }
